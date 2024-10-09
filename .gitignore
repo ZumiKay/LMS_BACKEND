@@ -1,3 +1,5 @@
 node_modules
 .env
-./Types/env.d.ts
+
+
+.vercel

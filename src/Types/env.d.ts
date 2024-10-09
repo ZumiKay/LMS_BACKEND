@@ -11,12 +11,13 @@ declare namespace NodeJS {
     JWT_SECRET: string;
     REFRESH_JWT_SECRET: string;
     GOOGLEBOOK_APIKEY: string;
-    ACCESSTOKEN_LIFE: number;
-    REFRESHTOKEN_LIFE: number;
+    ACCESSTOKEN_LIFE: string;
+    REFRESHTOKEN_LIFE: string;
     ACCESSTOKEN_COOKIENAME: string;
     REFRESHTOKEN_COOKIENAME: string;
     EMAIL_KEY: string;
     EMAIL: string;
+    BLOB_READ_WRITE_TOKEN: string;
     PORT?: string;
   }
 }

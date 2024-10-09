@@ -9,6 +9,9 @@ import {
 } from "sequelize-typescript";
 import Category from "./category.model";
 import Categoryitem from "./category_item.model";
+import { BookStatus, ISBN_OBJ } from "../Types/BookType";
+import BorrowBook from "./borrowbook.model";
+import BookCart from "./bookcart.model";
 
 @Table
 class Book extends Model<
@@ -22,7 +25,7 @@ class Book extends Model<
     type: DataTypes.JSONB,
     allowNull: false,
   })
-  ISBN: object;
+  ISBN: ISBN_OBJ[];
 
   @Column({
     type: DataTypes.STRING,
@@ -40,7 +43,7 @@ class Book extends Model<
   description: string | null;
 
   @Column({ type: DataTypes.JSONB, allowNull: false })
-  author: object;
+  author: string[];
 
   @Column
   publisher_date: Date;
@@ -51,10 +54,16 @@ class Book extends Model<
   @Column({ type: DataTypes.INTEGER, allowNull: true, defaultValue: 0 })
   borrow_count: number | null;
 
+  @Column({ type: DataTypes.DATE, allowNull: true })
+  return_date: Date | null;
+
   @CreatedAt
   createdAt: Date;
   @UpdatedAt
   updatedAt: Date;
+
+  @BelongsToMany(() => BorrowBook, () => BookCart)
+  borrowbook: BorrowBook[];
 }
 
 export default Book;

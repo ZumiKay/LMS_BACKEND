@@ -120,10 +120,14 @@ export async function GetBook(req: Request, res: Response) {
       case "filter":
         const filterConditions: any = {};
 
-        //TODO Adjust ISBN and Author Type For Better Query
         // Add conditions to the filter object only if they exist
         if (filter?.ISBN) {
-          filterConditions.ISBN = filter.ISBN;
+          filterConditions.ISBN = {
+            [Op.or]: filter.ISBN.map((isbnObj) => ({
+              type: isbnObj.type,
+              identifier: isbnObj.identifier,
+            })),
+          };
         }
 
         if (filter?.title) {
@@ -145,7 +149,7 @@ export async function GetBook(req: Request, res: Response) {
         }
 
         const filteredBooks = await Book.findAll({
-          where: filterConditions,
+          where: { ...filterConditions },
           limit,
         });
 

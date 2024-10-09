@@ -12,6 +12,9 @@ import bcrypt from "bcryptjs";
 import { HashPassword } from "../../Utilities/Security";
 import { SendEmail } from "../../config/email";
 import { GenerateRandomCode } from "../../Utilities/Helper";
+import BorrowBook from "../../models/borrowbook.model";
+import LibraryEntry from "../../models/libraryentry.model";
+import Usersession from "../../models/usersession.model";
 
 export async function GetUserInfo(req: CustomReqType, res: Response) {
   try {
@@ -114,7 +117,9 @@ export async function DeleteUser(req: CustomReqType, res: Response) {
         status: ErrorCode("No Access"),
       });
 
-    //TODODelete Association of User
+    await BorrowBook.destroy({ where: { userId: req.user.id } });
+    await LibraryEntry.destroy({ where: { userId: req.user.id } });
+    await Usersession.destroy({ where: { userId: req.user.id } });
 
     await User.destroy({ where: { id: req.user.id } });
     return res.status(200).json({ message: "Delete Successfully" });

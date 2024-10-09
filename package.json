@@ -14,9 +14,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@vercel/blob": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-validator": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
@@ -24,6 +26,7 @@
     "nodemailer": "^6.9.15",
     "pg": "^8.13.0",
     "pg-hstore": "^2.3.4",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "sequelize": "^6.37.3",
     "sequelize-typescript": "^2.1.6"
@@ -37,6 +40,7 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.7.4",
     "@types/nodemailer": "^6.4.16",
+    "@types/qrcode": "^1.5.5",
     "@types/sequelize": "^4.28.20",
     "@types/supertest": "^6.0.2",
     "@types/validator": "^13.12.2",

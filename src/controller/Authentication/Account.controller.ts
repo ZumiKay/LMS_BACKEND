@@ -139,13 +139,13 @@ export async function Login(req: Request, res: Response) {
       },
     });
 
-    res.cookie(process.env.ACCESSTOKEN_COOKIENAME, AccessToken, {
+    res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, AccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       maxAge: refreshTokenExpire,
     });
-    res.cookie(process.env.REFRESHTOKEN_COOKIENAME, RefreshToken, {
+    res.cookie(process.env.REFRESHTOKEN_COOKIENAME as string, RefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -155,9 +155,7 @@ export async function Login(req: Request, res: Response) {
     return res.status(200).json({ message: "Logging In" });
   } catch (error) {
     console.log("Login User", error);
-    return res
-      .status(500)
-      .json({ message: "Error Occured", error: ErrorCode("Error Server 500") });
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
 
@@ -185,12 +183,42 @@ export async function SignOut(req: CustomReqType, res: Response) {
       },
     });
 
-    res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME);
-    res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME);
+    res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME as string);
+    res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME as string);
 
-    return res.status(204);
+    return res.status(200).json({ message: "Signed Out" });
   } catch (error) {
     console.log("Signout", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
+
+//Token Functions
+
+export async function RefreshToken(req: CustomReqType, res: Response) {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    const isValid = await Usersession.findOne({
+      where: {
+        session_id: token,
+        expiredAt: { [Op.lt]: new Date() },
+      },
+    });
+
+    if (!isValid) {
+      return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    }
+
+    const newToken = generateToken(
+      { ...req.user },
+      process.env.JWT_SECRET as string,
+      parseInt(process.env.ACCESSTOKEN_LIFE ?? "0")
+    );
+
+    return res.status(200).json({ data: newToken });
+  } catch (error) {
+    console.log("Refresh Token", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
