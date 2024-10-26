@@ -6,5 +6,5 @@ module.exports = {
   transform: {
     "^.+\\.ts?$": "ts-jest", // Use ts-jest for transforming TypeScript files
   },
-  testMatch: ["**/__tests__/**/*.test.(ts|js)"], // Test files pattern
+  testMatch: ["**/?(*.)+(spec|test).[tj]s?(x)"], // Test files pattern
 };

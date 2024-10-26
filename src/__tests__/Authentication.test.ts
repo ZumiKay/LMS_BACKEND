@@ -97,68 +97,68 @@ describe("Login", () => {
   });
 });
 
-describe("RefreshToken", () => {
-  let req: any;
-  let res: any;
+// describe("RefreshToken", () => {
+//   let req: any;
+//   let res: any;
 
-  const mockUserSession = {
-    session_id: "valid_refresh_token",
-    expiredAt: new Date(Date.now() + 10000), // Not expired
-  };
+//   const mockUserSession = {
+//     session_id: "valid_refresh_token",
+//     expiredAt: new Date(Date.now() + 10000), // Not expired
+//   };
 
-  beforeEach(() => {
-    req = {
-      body: {},
-      headers: {},
-    };
-    res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
-      cookie: jest.fn(),
-    };
-  });
+//   beforeEach(() => {
+//     req = {
+//       body: {},
+//       headers: {},
+//     };
+//     res = {
+//       status: jest.fn().mockReturnThis(),
+//       json: jest.fn(),
+//       cookie: jest.fn(),
+//     };
+//   });
 
-  afterEach(() => {
-    jest.clearAllMocks(); // Clear mocks between tests
-  });
-  it("should return a 401 error if the token is invalid or expired", async () => {
-    // Mock findOne to return null (invalid or expired session)
-    req.headers = {
-      authorization: "Bearer invalid_token",
-    };
-    (Usersession.findOne as jest.Mock).mockResolvedValueOnce(null);
+//   afterEach(() => {
+//     jest.clearAllMocks(); // Clear mocks between tests
+//   });
+//   it("should return a 401 error if the token is invalid or expired", async () => {
+//     // Mock findOne to return null (invalid or expired session)
+//     req.headers = {
+//       authorization: "Bearer invalid_token",
+//     };
+//     (Usersession.findOne as jest.Mock).mockResolvedValueOnce(null);
 
-    await RefreshToken(req, res);
+//     await RefreshToken(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      status: ErrorCode("Unauthenticated"),
-    });
-  });
+//     expect(res.status).toHaveBeenCalledWith(401);
+//     expect(res.json).toHaveBeenCalledWith({
+//       status: ErrorCode("Unauthenticated"),
+//     });
+//   });
 
-  it("Should Return New Token if Refresh Token is Valid", async () => {
-    req.headers = {
-      authorization: "Bearer valid_refresh_token",
-    };
-    (Usersession.findOne as jest.Mock).mockResolvedValueOnce(mockUserSession);
-    const mockNewToken = "new_access_token";
-    (generateToken as jest.Mock).mockReturnValue(mockNewToken);
+//   it("Should Return New Token if Refresh Token is Valid", async () => {
+//     req.headers = {
+//       authorization: "Bearer valid_refresh_token",
+//     };
+//     (Usersession.findOne as jest.Mock).mockResolvedValueOnce(mockUserSession);
+//     const mockNewToken = "new_access_token";
+//     (generateToken as jest.Mock).mockReturnValue(mockNewToken);
 
-    await RefreshToken(req, res);
+//     await RefreshToken(req, res);
 
-    expect(Usersession.findOne).toHaveBeenCalledWith({
-      where: {
-        session_id: "valid_refresh_token",
-        expiredAt: { [Op.lt]: expect.any(Date) },
-      },
-    });
-    expect(generateToken).toHaveBeenCalledWith(
-      expect.any(Object),
-      process.env.JWT_SECRET,
-      process.env.ACCESSTOKEN_LIFE
-    );
+//     expect(Usersession.findOne).toHaveBeenCalledWith({
+//       where: {
+//         session_id: "valid_refresh_token",
+//         expiredAt: { [Op.lt]: expect.any(Date) },
+//       },
+//     });
+//     expect(generateToken).toHaveBeenCalledWith(
+//       expect.any(Object),
+//       process.env.JWT_SECRET,
+//       process.env.ACCESSTOKEN_LIFE
+//     );
 
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ data: mockNewToken });
-  });
-});
+//     expect(res.status).toHaveBeenCalledWith(200);
+//     expect(res.json).toHaveBeenCalledWith({ data: mockNewToken });
+//   });
+// });

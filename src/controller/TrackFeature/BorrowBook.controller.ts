@@ -6,11 +6,12 @@ import QRCode from "qrcode";
 import { DeleteFromStorage, UploadToStorage } from "../../config/storage";
 import { CustomReqType } from "../../Types/AuthenticationType";
 import { BookStatus, EditBorrowBookType } from "../../Types/BookType";
-import { sequelize } from "../../config/database";
+import sequelize from "../../config/database";
 import Book from "../../models/book.model";
-import BookCart from "../../models/bookcart.model";
-import User from "../../models/user.model";
 import { Op } from "sequelize";
+import User from "../../models/user.model";
+import Bucket from "../../models/bucket.model";
+import BookBucket from "../../models/bookbucket.model";
 
 export default async function BorrowBookHandler(
   req: CustomReqType,
@@ -18,10 +19,25 @@ export default async function BorrowBookHandler(
 ) {
   const transaction = await sequelize.transaction();
   try {
-    const data = req.body as BorrowBook;
-    if (!data.books || data.books.length === 0) {
+    const data = req.body as { bucketId: number };
+
+    if (data.bucketId)
       return res.status(400).json({ status: ErrorCode("Bad Request") });
-    }
+
+    const bucket = await Bucket.findByPk(data.bucketId, {
+      transaction,
+      include: {
+        model: Book,
+        as: "books",
+        required: true,
+      },
+      attributes: {
+        include: ["books"],
+      },
+    });
+
+    if (!bucket)
+      return res.status(404).json({ status: ErrorCode("Not Found") });
 
     // Generate Unique Borrow ID
     let generatedCode: string;
@@ -51,30 +67,22 @@ export default async function BorrowBookHandler(
     const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     // Create Borrow Record
-    await BorrowBook.create(
-      {
-        borrow_id: generatedCode,
-        userId: req.user.id as number,
-        status: BookStatus.TOPICKUP,
-        qrcode: qrCodeUrl.url,
-        expect_return_date: nextDay,
-      },
-      { transaction }
+    const createdBorrowBook = await BorrowBook.create({
+      borrow_id: generatedCode,
+      userId: req.user.id as number,
+      status: BookStatus.TOPICKUP,
+      qrcode: qrCodeUrl.url,
+      expect_return_date: nextDay,
+    });
+
+    await Bucket.update(
+      { borrowbookId: createdBorrowBook.id },
+      { where: { id: data.bucketId }, transaction }
     );
-
-    const bookCartData = data.books.map((book) => ({
-      bookID: book.id,
-      borrowID: generatedCode,
-    }));
-
-    const bookIds = data.books.map((book) => book.id) as number[];
-
-    //  create records in BookCart
-    await BookCart.bulkCreate(bookCartData, { transaction });
 
     // Update all books
 
-    for (const book of data.books) {
+    for (const book of bucket.books) {
       await Book.update(
         {
           status: BookStatus.UNAVAILABLE,
@@ -91,7 +99,13 @@ export default async function BorrowBookHandler(
 
     await transaction.commit();
 
-    return res.status(200).json({ message: "Checkout Completed" });
+    return res.status(200).json({
+      message: "Checkout Completed",
+      data: {
+        borrow_id: generatedCode,
+        qrcode: qrCodeUrl.url,
+      },
+    });
   } catch (error) {
     if (transaction) await transaction.rollback();
     console.log("Borrow Book Error", error);
@@ -112,7 +126,19 @@ export async function BorrowBookPickUpAndReturn(
 
     const borrowedbook = await BorrowBook.findOne({
       where: { borrow_id: data.borrowId },
-      include: [BookCart, Book, User],
+      include: [
+        {
+          model: Bucket,
+          as: "bucket",
+          required: true,
+          include: [{ model: Book, as: "books" }],
+        },
+        {
+          model: User,
+          as: "user",
+          required: true,
+        },
+      ],
       transaction,
     });
 
@@ -147,7 +173,7 @@ export async function BorrowBookPickUpAndReturn(
             ID: borrowedbook.user.studentID,
             department: borrowedbook.user.department,
           },
-          Books: borrowedbook.books,
+          Books: borrowedbook.bucket.books,
         });
 
       case "return":
@@ -159,7 +185,7 @@ export async function BorrowBookPickUpAndReturn(
           { where: { borrow_id: data.borrowId }, transaction }
         );
 
-        const bookIds = borrowedbook.books.map((book) => book.id);
+        const bookIds = borrowedbook.bucket.books.map((book) => book.id);
         await Book.update(
           { status: BookStatus.AVAILABLE },
           {
@@ -190,10 +216,7 @@ export async function BorrowBookPickUpAndReturn(
   }
 }
 
-export async function HandleIndividualReturn(
-  req: CustomReqType,
-  res: Response
-) {
+export async function HandleManualReturn(req: CustomReqType, res: Response) {
   const transaction = await sequelize.transaction();
 
   try {
@@ -206,7 +229,14 @@ export async function HandleIndividualReturn(
 
     const borrowedBook = await BorrowBook.findOne({
       where: { borrow_id: borrowId },
-      include: [BookCart, Book],
+      include: [
+        {
+          model: Bucket,
+          as: "bucket",
+          required: true,
+          include: [{ model: Book, as: "books" }],
+        },
+      ],
       transaction,
     });
 
@@ -219,10 +249,10 @@ export async function HandleIndividualReturn(
 
     //update borrowbook status
 
-    const unavailableBook = borrowedBook.books.filter(
+    const unavailableBook = borrowedBook.bucket.books.filter(
       (book) => book.status === BookStatus.UNAVAILABLE
     );
-    const availablebook = borrowedBook.books.filter(
+    const availablebook = borrowedBook.bucket.books.filter(
       (i) => i.status === BookStatus.AVAILABLE
     );
     const updatedstatus =
@@ -263,37 +293,60 @@ export async function HandleIndividualReturn(
 export async function DeleteBorrow_Book(req: Request, res: Response) {
   const transaction = await sequelize.transaction();
   try {
-    const { id }: { id: string } = req.body;
+    const { id }: { id: string[] } = req.body;
     if (!id) return res.status(400).json({ status: ErrorCode("Bad Request") });
 
-    const borrowbook = await BorrowBook.findOne({ where: { id }, transaction });
+    const borrowbook = await BorrowBook.findAll({
+      where: { id: { [Op.in]: id } },
+      transaction,
+      include: [
+        {
+          model: Bucket,
+          as: "bucket",
+          required: true,
+          include: [{ model: Book, as: "books" }],
+        },
+      ],
+    });
 
     if (!borrowbook) {
       await transaction.rollback();
       return res.status(404).json({ status: ErrorCode("Not Found") });
     }
 
-    if (borrowbook.status !== BookStatus.RETURNED) {
-      await Book.update(
-        { status: BookStatus.AVAILABLE },
-        {
-          where: {
-            [Op.and]: [
-              {
-                id: {
-                  [Op.in]: borrowbook.books.map((i) => i.id),
+    for (const borrow of borrowbook) {
+      if (borrow.status !== BookStatus.RETURNED) {
+        await Book.update(
+          { status: BookStatus.AVAILABLE },
+          {
+            where: {
+              [Op.and]: [
+                {
+                  id: {
+                    [Op.in]: borrow.bucket.books.map((i) => i.id),
+                  },
                 },
-              },
-              { status: BookStatus.UNAVAILABLE },
-            ],
-          },
-          transaction,
-        }
-      );
+                { status: BookStatus.UNAVAILABLE },
+              ],
+            },
+            transaction,
+          }
+        );
+      }
     }
 
-    await BorrowBook.destroy({ where: { borrow_id: id }, transaction });
-
+    await BookBucket.destroy({
+      where: { bucketId: { [Op.in]: borrowbook.map((i) => i.bucket.id) } },
+      transaction,
+    });
+    await Bucket.destroy({
+      where: { id: { [Op.in]: borrowbook.map((i) => i.bucket.id) } },
+      transaction,
+    });
+    await BorrowBook.destroy({
+      where: { borrow_id: { [Op.in]: id } },
+      transaction,
+    });
     await transaction.commit();
     return res.status(200).json({ message: "Delete Successfully" });
   } catch (error) {

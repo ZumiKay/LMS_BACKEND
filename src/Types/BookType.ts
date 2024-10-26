@@ -5,13 +5,10 @@ export interface GetBookType {
   id?: number;
   type?: "all" | "id" | "filter";
   limit?: number;
-  filter?: {
-    ISBN?: ISBN_OBJ[];
-    title?: string;
-    publisher_date?: Date;
-    status?: string;
-    createAt?: Date;
-  };
+  page?: number;
+  search?: string;
+  popular?: boolean;
+  latest?: boolean;
 }
 
 export interface ISBN_OBJ {
@@ -42,4 +39,24 @@ export interface BorrowBookReturnType {
   qrcode: string | null;
   retrun_date?: string;
   updatedAt: Date;
+}
+
+export interface CategoryType {
+  name: string;
+  description?: string;
+}
+
+export interface BookBucketType {
+  id?: number;
+  bookIds: number[];
+}
+
+export interface DeleteBookBucketType {
+  bookId: number;
+  bucketId: number;
+  all?: boolean;
+}
+
+export interface BorrowBookDataType {
+  bucketId: number;
 }

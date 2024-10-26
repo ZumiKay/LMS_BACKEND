@@ -2,9 +2,12 @@ import express, { Request, Response } from "express";
 import InitalStartSever from "./config/Initial";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import "./config/dotenv";
 
 import Router from "./Router";
+import { configDotenv } from "dotenv";
+import { getgooglebook } from "./controller/Admin/Book.controller";
+
+configDotenv();
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -21,10 +24,6 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello, TypeScript with Express!");
 });
 
-app.get("/api/hello", (req: Request, res: Response) => {
-  res.status(200).json({ message: "Hello, World!" });
-});
-
 // A POST route
 app.post("/api/data", (req: Request, res: Response) => {
   const { data } = req.body;
@@ -34,6 +33,17 @@ app.post("/api/data", (req: Request, res: Response) => {
     res.status(400).json({ error: "No data provided" });
   }
 });
+
+// app.get("/getbook", async (req: Request, res: Response) => {
+//   const get = await getgooglebook("Adventure");
+//   if (get.success) {
+//     console.log("Got Google Book");
+//   } else {
+//     console.log("Error");
+//   }
+
+//   res.status(200).send("Get Book");
+// });
 
 app.listen(port, () => {
   InitalStartSever();

@@ -1,6 +1,16 @@
 import { Sequelize } from "sequelize-typescript";
 import "../config/dotenv";
-import path from "path";
+import Category from "../models/category.model";
+import Categoryitem from "../models/category_item.model";
+import Book from "../models/book.model";
+
+import BorrowBook from "../models/borrowbook.model";
+import User from "../models/user.model";
+import Department from "../models/department.model";
+import Usersession from "../models/usersession.model";
+import LibraryEntry from "../models/libraryentry.model";
+import Bucket from "../models/bucket.model";
+import BookBucket from "../models/bookbucket.model";
 
 const sequelize = new Sequelize({
   dialect: "postgres",
@@ -8,7 +18,19 @@ const sequelize = new Sequelize({
   database: process.env.DB_NAME,
   username: process.env.DB_USER,
   password: process.env.DB_PASS,
-  models: [path.join(__dirname, "../models")],
 });
 
-export { sequelize };
+sequelize.addModels([
+  Category,
+  Categoryitem,
+  Book,
+  Bucket,
+  BookBucket,
+  BorrowBook,
+  User,
+  Department,
+  Usersession,
+  LibraryEntry,
+]);
+
+export default sequelize;

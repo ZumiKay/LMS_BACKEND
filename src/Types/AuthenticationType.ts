@@ -3,6 +3,12 @@ import Department from "../models/department.model";
 
 export type Role = "STUDENT" | "HEADDEPARTMENT" | "LIBRARIAN";
 
+export enum ROLE {
+  STUDENT = "STUDENT",
+  HEADDEPARTMENT = "HEADDEPARTMENT",
+  LIBRARIAN = "LIBRARIAN",
+}
+
 export interface Usertype {
   id?: number;
   firstname: string;
@@ -31,8 +37,14 @@ export interface CustomReqType extends Request {
   user: Pick<Usertype, "id" | "role" | "studentID">;
 }
 
-export interface EditUserType extends Usertype {
+export interface EditUserType {
+  id: number;
+  firstname?: string;
+  lastname?: string;
+  studentID?: string;
+  email?: string;
   edittype: "Name" | "Email" | "Password" | "ID" | "AdminName";
+  password?: string;
   newpassword?: string;
 }
 

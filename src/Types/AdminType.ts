@@ -1,4 +1,3 @@
-import BorrowBook from "../models/borrowbook.model";
 import LibraryEntry from "../models/libraryentry.model";
 
 export interface StudentCardReturnType {
@@ -27,4 +26,16 @@ export interface ExcelDataType {
   phone_number: string | null;
   library_entry: LibraryEntry[] | null;
   borrowedbook: Date[];
+}
+
+export interface FilterSummaryStudentType {
+  name: string;
+  filter: {
+    start: Date;
+    end: Date;
+  };
+}
+export interface SummaryStudentParamType {
+  department: string;
+  filtervalue: FilterSummaryStudentType[];
 }

@@ -4,6 +4,7 @@ import {
   Column,
   CreatedAt,
   ForeignKey,
+  HasOne,
   Model,
   Table,
 } from "sequelize-typescript";
@@ -11,19 +12,15 @@ import Book from "./book.model";
 import User from "./user.model";
 import { DataTypes, InferAttributes, InferCreationAttributes } from "sequelize";
 import { BookStatus } from "../Types/BookType";
-import BookCart from "./bookcart.model";
+import Bucket from "./bucket.model";
 
 @Table
 class BorrowBook extends Model<
   InferAttributes<BorrowBook>,
-  InferCreationAttributes<BorrowBook, { omit: "books" | "user" | "createdAt" }>
+  InferCreationAttributes<BorrowBook, { omit: "user" | "createdAt" | "bucket" }>
 > {
   @Column({ unique: true, type: DataTypes.STRING, allowNull: false })
   borrow_id: string;
-
-  //M TO M WITH BOOK
-  @BelongsToMany(() => Book, () => BookCart)
-  books: Book[];
 
   //User Relationship
   @ForeignKey(() => User)
@@ -49,6 +46,10 @@ class BorrowBook extends Model<
 
   @CreatedAt
   createdAt: Date;
+
+  //Buckets of Book
+  @HasOne(() => Bucket)
+  bucket: Bucket;
 }
 
 export default BorrowBook;

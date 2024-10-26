@@ -9,26 +9,26 @@ import {
 } from "sequelize-typescript";
 import Category from "./category.model";
 import Categoryitem from "./category_item.model";
-import { BookStatus, ISBN_OBJ } from "../Types/BookType";
-import BorrowBook from "./borrowbook.model";
-import BookCart from "./bookcart.model";
+import { ISBN_OBJ } from "../Types/BookType";
+import Bucket from "./bucket.model";
+import BookBucket from "./bookbucket.model";
 
 @Table
 class Book extends Model<
   InferAttributes<Book>,
   InferCreationAttributes<Book, { omit: "categories" }>
 > {
-  @BelongsToMany(() => Category, () => Categoryitem)
-  categories: Category[];
-
   @Column({
     type: DataTypes.JSONB,
     allowNull: false,
   })
   ISBN: ISBN_OBJ[];
 
+  @BelongsToMany(() => Category, () => Categoryitem)
+  categories: Category[];
+
   @Column({
-    type: DataTypes.STRING,
+    type: DataTypes.TEXT,
     allowNull: true,
   })
   cover_img: string | null;
@@ -39,7 +39,7 @@ class Book extends Model<
   })
   title: string;
 
-  @Column({ type: DataTypes.STRING, allowNull: true })
+  @Column({ type: DataTypes.TEXT, allowNull: true })
   description: string | null;
 
   @Column({ type: DataTypes.JSONB, allowNull: false })
@@ -62,8 +62,9 @@ class Book extends Model<
   @UpdatedAt
   updatedAt: Date;
 
-  @BelongsToMany(() => BorrowBook, () => BookCart)
-  borrowbook: BorrowBook[];
+  //Buckets
+  @BelongsToMany(() => Bucket, () => BookBucket)
+  buckets: Bucket[];
 }
 
 export default Book;

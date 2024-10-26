@@ -1,35 +1,132 @@
 // Adjust the path accordingly
 
-import { getDateWithOffset } from "../Utilities/Helper";
+import {
+  DeleteUser,
+  EditUserInfo,
+} from "../controller/Authentication/User.controller";
+import User from "../models/user.model";
+import bcrypt from "bcryptjs";
+import ErrorCode from "../Utilities/ErrorCode";
+import { ROLE } from "../Types/AuthenticationType";
 
-describe("getDateWithOffset", () => {
-  // Mock the Date object to return a fixed date
-  const mockedDate = new Date("2024-09-30T12:00:00Z"); // UTC time
+jest.mock("../models/user.model");
+jest.mock("bcryptjs");
+jest.mock("../Utilities/Security");
+jest.mock("../Utilities/ErrorCode");
+jest.mock("../Utilities/Helper");
 
-  beforeAll(() => {
-    jest.useFakeTimers();
-    jest.setSystemTime(mockedDate); // Freeze time to the mocked date
+describe("EditUserInfo", () => {
+  let req: any;
+  let res: any;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnValue({ json: jsonMock });
+
+    // Setup mock response
+    res = {
+      status: statusMock,
+    };
+
+    // Setup default mock request
+    req = {
+      body: {
+        id: 1,
+        edittype: "Password",
+        password: "oldpassword",
+        newpassword: "newpassword",
+      },
+      user: {
+        id: 1,
+        role: "STUDENT",
+      },
+    };
   });
 
-  afterAll(() => {
-    jest.useRealTimers(); // Reset Jest's fake timers
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  it("should return the date with an offset of 1 hour (60 * 60 seconds)", () => {
-    const result = getDateWithOffset(60 * 60); // Offset of 1 hour
-    const expectedDate = new Date("2024-09-30T13:00:00Z"); // 1 hour later
-    expect(result).toEqual(expectedDate);
+  it("should return 404 if user is not found", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue(null);
+
+    await EditUserInfo(req, res);
+
+    expect(statusMock).toHaveBeenCalledWith(404);
+    expect(jsonMock).toHaveBeenCalledWith({ status: ErrorCode("Not Found") });
   });
 
-  it("should return the date with an offset of -1 hour (-(60 * 60) seconds)", () => {
-    const result = getDateWithOffset(-60 * 60); // Offset of -1 hour
-    const expectedDate = new Date("2024-09-30T11:00:00Z"); // 1 hour earlier
-    expect(result).toEqual(expectedDate);
+  it("should return 400 if password does not match", async () => {
+    const mockUser = { password: "hashedpassword" };
+    (User.findByPk as jest.Mock).mockResolvedValue(mockUser);
+    (bcrypt.compareSync as jest.Mock).mockReturnValue(false);
+
+    await EditUserInfo(req, res);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({ status: ErrorCode("Bad Request") });
   });
 
-  it("should return the date with an offset of 24 hours (60 * 60 * 24 seconds)", () => {
-    const result = getDateWithOffset(60 * 60 * 24); // Offset of 24 hours
-    const expectedDate = new Date("2024-10-01T12:00:00Z"); // 24 hours later
-    expect(result).toEqual(expectedDate);
+  it("should update name for student role", async () => {
+    req.body = {
+      id: 1,
+      edittype: "Name",
+      firstname: "John",
+      lastname: "Doe",
+      password: "password",
+    };
+    (bcrypt.compareSync as jest.Mock).mockReturnValue(true);
+
+    const mockUser = { id: 1, role: "STUDENT" };
+
+    (User.findByPk as jest.Mock).mockReturnValue(mockUser);
+    User.update as jest.Mock;
+
+    await EditUserInfo(req, res);
+
+    expect(User.update).toHaveBeenCalled();
+    expect(statusMock).toHaveBeenCalledWith(200);
+    expect(jsonMock).toHaveBeenCalledWith({ message: "Update Successfully" });
+  });
+
+  it("should return 500 on error", async () => {
+    (User.findByPk as jest.Mock).mockRejectedValue(new Error("Database error"));
+
+    await EditUserInfo(req, res);
+
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({
+      status: ErrorCode("Error Server 500"),
+    });
+  });
+});
+
+describe("Delete User", () => {
+  let res: any;
+  let req: any;
+
+  beforeEach(() => {
+    req = {
+      user: {},
+      body: {},
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  test("Return 403", async () => {
+    req.user = {
+      id: 1,
+      role: ROLE.LIBRARIAN,
+    };
+    await DeleteUser(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });

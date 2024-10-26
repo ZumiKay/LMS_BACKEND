@@ -32,15 +32,35 @@ export async function ExportReport(req: Request, res: Response) {
             attributes: {
               exclude: ["password"],
             },
-            include: [LibraryEntry, Department],
+            include: [
+              {
+                model: LibraryEntry,
+                as: "entries",
+              },
+              {
+                model: Department,
+                as: "deparment",
+              },
+            ],
           })
         : await User.findAll({
             where: { role: "STUDENT" },
             attributes: {
               exclude: ["password"],
             },
-            include: [LibraryEntry, BorrowBook, Department],
+            include: [
+              {
+                model: LibraryEntry,
+                as: "entries",
+              },
+              {
+                model: Department,
+                as: "deparment",
+              },
+              { model: BorrowBook, as: "borrowbooks" },
+            ],
           });
+
     if (result.length === 0)
       return res
         .status(404)

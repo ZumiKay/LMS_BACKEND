@@ -12,7 +12,6 @@ import ErrorCode from "../../Utilities/ErrorCode";
 import Usersession from "../../models/usersession.model";
 import bcrypt from "bcryptjs";
 import { getDateWithOffset } from "../../Utilities/Helper";
-import { SendEmail } from "../../config/email";
 
 interface RegisterType extends Usertype {
   html: string;
@@ -36,7 +35,7 @@ export default async function RegisterUser(
     } = req.body as RegisterType;
 
     // Validate required fields
-    if (!firstname || !lastname || !email || !password || !role || studentID) {
+    if (!firstname || !lastname || !email || !password || !role || !studentID) {
       return res.status(400).json({ error: "Required fields are missing" });
     }
     const hashedpass = HashPassword(password);
@@ -60,9 +59,9 @@ export default async function RegisterUser(
     });
 
     //Send Email
-    await SendEmail(email, "Login Information", html);
+    // await SendEmail(email, "Login Information", html);
 
-    return res.status(200).json({ message: "Student Created" });
+    return res.status(200).json({ message: "User Created" });
   } catch (error) {
     console.log("Register Student", error);
     return res.status(500).json(ErrorCode("Error Server 500"));
@@ -73,7 +72,7 @@ export async function Login(req: Request, res: Response) {
   try {
     const data = req.body as LoginType;
 
-    if ((!data.email && !data.id) || !data.password)
+    if (!data.email || !data.password)
       return res.status(400).json({ message: "Not Allowed", error: 0 });
 
     const user = await User.findOne({
@@ -82,7 +81,7 @@ export async function Login(req: Request, res: Response) {
           {
             email: data.email,
           },
-          data.id ? { studentID: data.id } : {},
+          { studentID: data.email },
         ],
       },
     });
@@ -161,8 +160,8 @@ export async function Login(req: Request, res: Response) {
 
 export async function SignOut(req: CustomReqType, res: Response) {
   try {
-    const data: Pick<Usertype, "access_token" | "refresh_token"> = req.body;
-    if (!data.access_token || !data.refresh_token || !req.user) {
+    const data: Pick<Usertype, "refresh_token"> = req.body;
+    if (!data.refresh_token || !req.user) {
       return res.status(400).json({
         message: "Invalid Parameter",
         status: ErrorCode("Bad Request"),
@@ -198,7 +197,6 @@ export async function SignOut(req: CustomReqType, res: Response) {
 export async function RefreshToken(req: CustomReqType, res: Response) {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-
     const isValid = await Usersession.findOne({
       where: {
         session_id: token,

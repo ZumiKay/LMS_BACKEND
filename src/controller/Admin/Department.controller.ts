@@ -1,7 +1,7 @@
 import { Response, Request } from "express";
 import Department from "../../models/department.model";
 import ErrorCode from "../../Utilities/ErrorCode";
-import { sequelize } from "../../config/database";
+import sequelize from "../../config/database";
 import User from "../../models/user.model";
 
 export async function CreateDepartment(req: Request, res: Response) {
@@ -67,9 +67,19 @@ export async function DeleteDepartment(req: Request, res: Response) {
 
 export async function GetDepartment(req: Request, res: Response) {
   try {
-    const data = await Department.findAll();
+    const data = req.query as { ty: "fac" | "dep" };
 
-    return res.status(200).json({ data });
+    const deparments = await Department.findAll();
+
+    let result: any;
+
+    if (data.ty === "dep") {
+      result = deparments;
+    } else if (data.ty === "fac") {
+      result = deparments.map(({ faculty }) => faculty);
+    }
+
+    return res.status(200).json({ data: result });
   } catch (error) {
     console.log("Get Department", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });

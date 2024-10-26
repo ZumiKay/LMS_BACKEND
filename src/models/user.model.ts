@@ -11,6 +11,7 @@ import Usersession from "./usersession.model";
 import Department from "./department.model";
 import LibraryEntry from "./libraryentry.model";
 import BorrowBook from "./borrowbook.model";
+import Bucket from "./bucket.model";
 
 type Role = "STUDENT" | "HEADDEPARTMENT" | "LIBRARIAN";
 
@@ -72,6 +73,9 @@ class User extends Model<
   //Borrow Book
   @HasMany(() => BorrowBook)
   borrowbooks: BorrowBook[] | null;
+  //Book Bucket
+  @HasMany(() => Bucket)
+  buckets: Bucket[] | null;
 }
 
 export default User;

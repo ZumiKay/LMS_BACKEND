@@ -2,7 +2,7 @@ import { query, validationResult } from "express-validator";
 import { NextFunction, Request, Response } from "express";
 import ErrorCode from "../Utilities/ErrorCode";
 import JWT from "jsonwebtoken";
-import { CustomReqType, Role } from "../Types/AuthenticationType";
+import { CustomReqType, ROLE, Role } from "../Types/AuthenticationType";
 
 export const RegisterUserDataValidate = [
   query("firstname").isString().notEmpty(),
@@ -25,7 +25,7 @@ export const RegisterUserDataValidate = [
   },
 ];
 
-export const VerifyToken = (
+export const VerifyToken = async (
   req: CustomReqType,
   res: Response,
   next: NextFunction
@@ -36,23 +36,39 @@ export const VerifyToken = (
     return res.status(401).json({ status: ErrorCode("Unauthenticated") });
   }
 
-  JWT.verify(token, process.env.JWT_SECRET, (error, decoded) => {
-    if (error) {
-      return res.status(403).json({ status: ErrorCode("No Access") });
-    }
-    req.user = decoded as any;
-    next();
-  });
+  const payload = await JWT.verify(token, process.env.JWT_SECRET as string);
+  req.user = payload as any;
+
+  if (!payload) return res.status(403).json({ status: ErrorCode("No Access") });
+
+  return next();
 };
-export async function CheckRole(
+
+async function CheckRole({
+  role,
+  req,
+  res,
+  next,
+}: {
+  role: Role;
+  req: CustomReqType;
+  res: Response;
+  next: NextFunction;
+}) {
+  if (!req.user)
+    return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+  if (role === req.user.role) return next();
+
+  return res.status(403).json({ status: ErrorCode("No Access") });
+}
+export const IsAdmin = async (
   req: CustomReqType,
   res: Response,
-  next: NextFunction,
-  Role: Role
-) {
-  const role = req.user.role;
-  if (role !== Role && role !== "LIBRARIAN") {
-    return res.status(403).json({ status: ErrorCode("No Access") });
-  }
-  return next();
-}
+  next: NextFunction
+) => CheckRole({ role: ROLE.LIBRARIAN, req, res, next });
+
+export const IsHD = async (
+  req: CustomReqType,
+  res: Response,
+  next: NextFunction
+) => CheckRole({ role: ROLE.HEADDEPARTMENT || ROLE.LIBRARIAN, req, res, next });
