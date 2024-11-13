@@ -25,12 +25,40 @@ export const RegisterUserDataValidate = [
   },
 ];
 
+type PasswordValidationResult = {
+  isValid: boolean;
+  errors: string[];
+};
+export const PasswordValidate = (
+  password: string
+): PasswordValidationResult => {
+  const errors: string[] = [];
+
+  // Check if the password is at least 8 characters long
+  if (password.length < 8) {
+    errors.push("Password must be at least 8 characters long.");
+  }
+
+  // Check if the password contains at least one number or special character
+  if (!/[0-9!@#$%^&*]/.test(password)) {
+    errors.push(
+      "Password must contain at least one number or special character."
+    );
+  }
+
+  // Return the validation result with details
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+
 export const VerifyToken = async (
   req: CustomReqType,
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const token = req.cookies[process.env.ACCESSTOKEN_COOKIENAME as string];
 
   if (!token) {
     return res.status(401).json({ status: ErrorCode("Unauthenticated") });

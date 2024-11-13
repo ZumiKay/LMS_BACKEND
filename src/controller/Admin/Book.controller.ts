@@ -6,8 +6,13 @@ import sequelize from "../../config/database";
 import ErrorCode from "../../Utilities/ErrorCode";
 import { BookStatus, CategoryType, GetBookType } from "../../Types/BookType";
 
-import { convertQueryParams } from "../../Utilities/Helper";
-import { Op } from "sequelize";
+import { convertQueryParams, normalizeString } from "../../Utilities/Helper";
+import { cast, col, fn, Op, Sequelize, where } from "sequelize";
+import { CustomReqType } from "../../Types/AuthenticationType";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import BookBucket from "../../models/bookbucket.model";
+import Bucket from "../../models/bucket.model";
+import { del } from "@vercel/blob";
 
 const FindOrCreateCategory = async (Cate: CategoryType[]) => {
   const transaction = await sequelize.transaction();
@@ -116,46 +121,103 @@ export async function RegisterBook(req: Request, res: Response) {
 }
 
 export async function EditBook(req: Request, res: Response) {
+  const transaction = await sequelize.transaction();
   try {
-    const editData = req.body as Book;
+    const { id, cover_img, categories, ...restEditData } = req.body as Book;
 
-    if (!editData.id)
+    if (!id) {
       return res.status(400).json({ status: ErrorCode("Bad Request") });
+    }
 
-    const book = await Book.findByPk(editData.id);
+    const book = await Book.findByPk(id, { include: [Category], transaction });
 
-    if (!book) return res.status(404).json({ status: ErrorCode("Not Found") });
+    if (!book) {
+      return res.status(404).json({ status: ErrorCode("Not Found") });
+    }
 
-    //Update Cases
-    if (editData.categories)
-      await FindOrCreateCategory(editData.categories as CategoryType[]);
+    //Update CoverImage
+    if (cover_img && book.cover_img) {
+      if (cover_img !== book.cover_img) {
+        await del(book.cover_img);
+      }
+    }
 
-    const updateData = Object.fromEntries(
-      Object.entries(editData).filter(
-        ([_, value]) => value !== undefined && value !== null
-      )
-    );
+    // Update categories if provided
+    if (categories) {
+      await FindOrCreateCategory(categories as CategoryType[]);
 
-    await Book.update(updateData, { where: { id: editData.id } });
+      const currentCategoryIds = new Set(book.categories.map((c) => c.id));
+      const newCategoryIds = new Set(categories.map((c) => c.id));
+
+      const categoriesToRemove = [...currentCategoryIds].filter(
+        (id) => !newCategoryIds.has(id)
+      );
+      const categoriesToAdd = [...newCategoryIds].filter(
+        (id) => !currentCategoryIds.has(id)
+      );
+
+      if (categoriesToRemove.length > 0) {
+        await Categoryitem.destroy({
+          where: { bookId: id, cateId: { [Op.in]: categoriesToRemove } },
+          transaction,
+        });
+      }
+
+      if (categoriesToAdd.length > 0) {
+        const newCategoryItems = categoriesToAdd.map((cateId) => ({
+          bookId: id,
+          cateId,
+        }));
+        await Categoryitem.bulkCreate(newCategoryItems, { transaction });
+      }
+    }
+    const updateData: Partial<Book> = {
+      ...restEditData,
+      ...(cover_img !== book.cover_img && { cover_img }),
+    };
+
+    await Book.update(updateData, { where: { id }, transaction });
+
+    await transaction.commit();
     return res.status(200).json({ message: "Update Successfully" });
   } catch (error) {
-    console.log("EditBook", error);
+    await transaction.rollback();
+    console.error("EditBook error:", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
 
 export async function DeleteBook(req: Request, res: Response) {
+  const { id }: { id: number[] } = req.body;
+
+  if (!Array.isArray(id) || id.length === 0) {
+    return res.status(400).json({ status: ErrorCode("Bad Request") });
+  }
+
   try {
-    const { id }: { id: number[] } = req.body;
-    if (!id) return res.status(400).json({ status: ErrorCode("Bad Request") });
+    await sequelize.transaction(async (transaction) => {
+      const relatedBucketIds = await BookBucket.findAll({
+        where: { bookId: { [Op.in]: id } },
+        attributes: ["bucketId"],
+        transaction,
+      }).then((buckets) => buckets.map((bucket) => bucket.bucketId));
 
-    //TODO Delete Associate of Book (User , BorrowBook)
+      if (relatedBucketIds.length > 0) {
+        await Bucket.destroy({
+          where: { id: { [Op.in]: relatedBucketIds } },
+          transaction,
+        });
+      }
 
-    await Book.destroy({ where: { id: { [Op.in]: id } } });
+      await Book.destroy({
+        where: { id: { [Op.in]: id } },
+        transaction,
+      });
+    });
 
-    return res.status(200).json({ message: "Delete Succesfully" });
+    return res.status(200).json({ message: "Delete Successfully" });
   } catch (error) {
-    console.log("Delete Book", error);
+    console.error("DeleteBook error:", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
@@ -167,6 +229,10 @@ const types = {
   page: "int",
   popular: "boolean",
   latest: "boolean",
+  search: "string",
+  cate: "string",
+  status: "string",
+  cates: "string",
 };
 
 export async function GetBook(req: Request, res: Response) {
@@ -178,6 +244,10 @@ export async function GetBook(req: Request, res: Response) {
       page = 1,
       popular,
       latest,
+      search,
+      cate,
+      status,
+      cates,
     } = convertQueryParams<typeof types>(
       req.query as any,
       types as any
@@ -188,22 +258,32 @@ export async function GetBook(req: Request, res: Response) {
         const { count, rows } = await Book.findAndCountAll({
           limit,
           offset: (page - 1) * limit,
+          order: ["id"],
+          include: [
+            {
+              model: Category,
+            },
+          ],
         });
-        return res
-          .status(200)
-          .json({
-            data: rows,
-            totalpage: Math.ceil(count / limit),
-            totalcount: count,
-          });
+        return res.status(200).json({
+          data: rows,
+          totalcount: count,
+        });
       case "id":
         if (!id)
           return res.status(400).json({ status: ErrorCode("Bad Request") });
-        const book = await Book.findByPk(id);
+        const book = await Book.findByPk(id, {
+          include: [{ model: Category, as: "categories" }],
+        });
+
+        if (!book) {
+          return res.status(404).json({ status: ErrorCode("Not Found") });
+        }
 
         return res.status(200).json({ data: book });
       case "filter":
         let result: any = [];
+        let totalcount = 0;
         if (popular) {
           result = await Book.findAll({
             where: {
@@ -212,6 +292,12 @@ export async function GetBook(req: Request, res: Response) {
               },
             },
             order: [["borrow_count", "DESC"]],
+            include: [
+              {
+                model: Category,
+              },
+            ],
+            limit,
           });
         } else if (latest) {
           const sevenDaysAgo = new Date();
@@ -222,18 +308,148 @@ export async function GetBook(req: Request, res: Response) {
                 [Op.gte]: sevenDaysAgo,
               },
             },
+            limit,
+            include: [
+              {
+                model: Category,
+              },
+            ],
+            order: ["id"],
+          });
+        } else if (search) {
+          const { rows, count } = await Book.findAndCountAll({
+            where: {
+              [Op.or]: [
+                where(
+                  fn("LOWER", fn("REPLACE", col("title"), " ", "")), // Remove spaces and lowercase title
+                  {
+                    [Op.like]: `%${normalizeString(search)}%`, // Use normalized search term
+                  }
+                ),
+                where(fn("LOWER", cast(col("ISBN"), "text")), {
+                  [Op.like]: `%${normalizeString(search)}%`,
+                }),
+                where(fn("LOWER", cast(col("author"), "text")), {
+                  [Op.like]: `%${normalizeString(search)}%`,
+                }),
+              ],
+            },
+            include: [
+              {
+                model: Category,
+              },
+            ],
+            limit,
+            offset: (page - 1) * limit,
+          });
+          result = rows;
+          totalcount = count;
+        } else if (cate) {
+          const category = await Category.findOne({
+            where: {
+              name: cate,
+            },
+            include: [{ model: Book, as: "items", order: ["id"] }],
+          });
+          result = category?.items;
+        } else if (cates) {
+          const offset = (page - 1) * limit;
+
+          // Step 1: Fetch book IDs with pagination
+          const bookIds = await Book.findAll({
+            attributes: ["id"],
+            include: {
+              model: Category,
+              where: { name: { [Op.in]: cates.split(",") } },
+              through: { attributes: [] }, // Avoid fetching join table columns
+            },
+            order: [["id", "ASC"]],
+            limit,
+            offset,
+          });
+
+          const ids = bookIds.map((book) => book.id);
+
+          // Step 2: Fetch detailed books with categories based on these IDs
+          const books = await Book.findAll({
+            where: { id: { [Op.in]: ids } },
+            include: [Category],
+            order: [["id", "ASC"]],
+          });
+
+          // Fetch the total count of books for the given categories
+          const totalBooks = await Book.count({
+            include: {
+              model: Category,
+              where: { name: { [Op.in]: cates.split(",") } },
+              through: { attributes: [] }, // Avoid fetching join table columns
+            },
+          });
+
+          result = books;
+          totalcount = totalBooks;
+        } else if (status) {
+          const { count, rows } = await Book.findAndCountAll({
+            where: {
+              status: {
+                [Op.in]: status.split(","),
+              },
+            },
+            limit,
+            offset: (page - 1) * limit,
+            include: [Category],
+          });
+          return res.status(200).json({
+            data: rows,
+            totalcount: count,
           });
         }
-
-        return res.status(200).json({ data: result });
-
-      // Add conditions to the filter object only if they exist
+        return res.status(200).json({ data: result, totalcount });
 
       default:
-        break;
+        return res.status(400).json({ status: ErrorCode("Bad Request") });
     }
   } catch (error) {
     console.log("Get Book", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
+
+export async function UploadCover(req: CustomReqType, res: Response) {
+  try {
+    const body = req.body as HandleUploadBody;
+    const jsonResponse = await handleUpload({
+      body,
+      request: req as any, // Cast to match expected type
+      onBeforeGenerateToken: async (
+        pathname: string
+        /* clientPayload */
+      ) => {
+        // Authenticate and authorize users before generating the token
+        // This example allows anonymous uploads for specific content types
+        return {
+          allowedContentTypes: ["image/jpeg", "image/png", "image/gif"],
+          tokenPayload: JSON.stringify({
+            // Optional payload, can include user information or metadata
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Logic after the upload is completed
+
+        try {
+          // Example: Update user avatar or other actions
+          // const { userId } = JSON.parse(tokenPayload);
+          // await db.update({ avatar: blob.url, userId });
+        } catch (error) {
+          throw new Error("Could not update user");
+        }
+      },
+    });
+
+    res.status(200).json(jsonResponse);
+  } catch (error) {
+    console.log("Upload Image", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }

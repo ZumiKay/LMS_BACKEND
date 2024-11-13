@@ -34,7 +34,11 @@ export interface LoginType {
 }
 
 export interface CustomReqType extends Request {
-  user: Pick<Usertype, "id" | "role" | "studentID">;
+  user: {
+    id: number;
+    role: ROLE;
+    uid: string;
+  };
 }
 
 export interface EditUserType {
@@ -43,9 +47,11 @@ export interface EditUserType {
   lastname?: string;
   studentID?: string;
   email?: string;
-  edittype: "Name" | "Email" | "Password" | "ID" | "AdminName";
+  edittype: "Name" | "Email" | "Password" | "ID" | "AdminName" | "other";
   password?: string;
   newpassword?: string;
+  dateofbirth?: Date;
+  phonenumber?: string;
 }
 
 export interface ResetPasswordType {

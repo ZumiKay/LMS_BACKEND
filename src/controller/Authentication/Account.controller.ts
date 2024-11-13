@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   CustomReqType,
   LoginType,
+  ROLE,
   Role,
   Usertype,
 } from "../../Types/AuthenticationType";
@@ -11,16 +12,14 @@ import { Op } from "sequelize";
 import ErrorCode from "../../Utilities/ErrorCode";
 import Usersession from "../../models/usersession.model";
 import bcrypt from "bcryptjs";
-import { getDateWithOffset } from "../../Utilities/Helper";
+import { GenerateRandomCode, getDateWithOffset } from "../../Utilities/Helper";
+import { SendEmail } from "../../config/email";
+import { randomBytes } from "crypto";
 
 interface RegisterType extends Usertype {
   html: string;
 }
-export default async function RegisterUser(
-  req: Request,
-  res: Response,
-  role: Role
-) {
+export default async function RegisterUser(req: Request, res: Response) {
   try {
     const {
       firstname,
@@ -30,14 +29,15 @@ export default async function RegisterUser(
       date_of_birth,
       phone_number,
       email,
-      password,
       html,
+      role,
     } = req.body as RegisterType;
 
     // Validate required fields
-    if (!firstname || !lastname || !email || !password || !role || !studentID) {
+    if (!firstname || !lastname || !email || !role || !studentID) {
       return res.status(400).json({ error: "Required fields are missing" });
     }
+    const password = GenerateRandomCode(8);
     const hashedpass = HashPassword(password);
 
     const isUser = await User.findOne({ where: { email: email } });
@@ -59,7 +59,11 @@ export default async function RegisterUser(
     });
 
     //Send Email
-    // await SendEmail(email, "Login Information", html);
+    await SendEmail(
+      email,
+      "Login Information",
+      html.replace(":code:", password)
+    );
 
     return res.status(200).json({ message: "User Created" });
   } catch (error) {
@@ -108,8 +112,8 @@ export async function Login(req: Request, res: Response) {
       role: user.role,
     };
 
-    const accessTokenExpire = 15 * 60; // 15min
-    const refreshTokenExpire = 60 * 60; // 1hr
+    const accessTokenExpire = 60 * 60; // 15min
+    const refreshTokenExpire = 2 * 60 * 60; // 1hr
 
     const AccessToken = generateToken(
       { id: user.id, uid: user.studentID, role: user.role },
@@ -140,18 +144,16 @@ export async function Login(req: Request, res: Response) {
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, AccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: refreshTokenExpire,
+      sameSite: "lax",
+      maxAge: accessTokenExpire * 1000,
     });
     res.cookie(process.env.REFRESHTOKEN_COOKIENAME as string, RefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: refreshTokenExpire,
+      sameSite: "lax",
+      maxAge: refreshTokenExpire * 1000,
     });
 
-    return res.status(200).json({ message: "Logging In" });
+    return res.status(200).json({ message: "Logged In" });
   } catch (error) {
     console.log("Login User", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
@@ -160,8 +162,9 @@ export async function Login(req: Request, res: Response) {
 
 export async function SignOut(req: CustomReqType, res: Response) {
   try {
-    const data: Pick<Usertype, "refresh_token"> = req.body;
-    if (!data.refresh_token || !req.user) {
+    const refershtoken =
+      req.cookies[process.env.REFRESHTOKEN_COOKIENAME as string];
+    if (!refershtoken || !req.user) {
       return res.status(400).json({
         message: "Invalid Parameter",
         status: ErrorCode("Bad Request"),
@@ -178,7 +181,7 @@ export async function SignOut(req: CustomReqType, res: Response) {
 
     await Usersession.destroy({
       where: {
-        [Op.and]: [{ userId: user.id, session_id: data.refresh_token }],
+        [Op.and]: [{ userId: user.id, session_id: refershtoken }],
       },
     });
 
@@ -196,7 +199,7 @@ export async function SignOut(req: CustomReqType, res: Response) {
 
 export async function RefreshToken(req: CustomReqType, res: Response) {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = req.cookies[process.env.REFRESHTOKEN_COOKIENAME as string];
     const isValid = await Usersession.findOne({
       where: {
         session_id: token,
@@ -214,9 +217,62 @@ export async function RefreshToken(req: CustomReqType, res: Response) {
       parseInt(process.env.ACCESSTOKEN_LIFE ?? "0")
     );
 
-    return res.status(200).json({ data: newToken });
+    const accessTokenExpire = 60 * 60; // 15min
+    // 1hr
+
+    res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, newToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: accessTokenExpire * 1000,
+    });
+
+    return res.status(200).json({ message: "Refreshed Token" });
   } catch (error) {
     console.log("Refresh Token", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
+
+export async function SeedAdmin() {
+  try {
+    const isAdmin = await User.findOne({ where: { role: ROLE.LIBRARIAN } });
+
+    if (isAdmin) {
+      console.log("Admin Exist");
+      return;
+    }
+
+    const data = {
+      firstname: "Test",
+      lastname: "Librarian",
+      role: ROLE.LIBRARIAN,
+      studentID: "00000001",
+      email: "workzumi@gmail.com",
+      password: HashPassword("KKzumi@001"),
+    };
+    await User.create({ ...data });
+    console.log("Seeded");
+  } catch (error) {
+    console.log("Seed Admin", error);
+    return;
+  }
+}
+
+export async function GetUserSession(req: CustomReqType, res: Response) {
+  try {
+    const user = req.user;
+
+    const userinfo = await User.findByPk(user.id, {
+      attributes: { exclude: ["password"] },
+    });
+
+    if (!userinfo) {
+      return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    }
+
+    return res.status(200).json({ data: req.user });
+  } catch (error) {
+    console.log("Check Usersession", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }

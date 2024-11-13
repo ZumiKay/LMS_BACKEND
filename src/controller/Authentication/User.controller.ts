@@ -17,16 +17,18 @@ import BorrowBook from "../../models/borrowbook.model";
 import LibraryEntry from "../../models/libraryentry.model";
 import Usersession from "../../models/usersession.model";
 import { Op } from "sequelize";
+import { PasswordValidate } from "../../middleware/UserValidate";
+import sequelize from "../../config/database";
+import Faculty from "../../models/faculty.model";
 
 export async function GetUserInfo(req: CustomReqType, res: Response) {
   try {
     const param = req.query;
-
     const user = await User.findOne({
-      where: { id: param?.id ? parseInt(param.id as string) : req.user.id },
-      include: [{ model: Department, as: "department" }],
+      where: { id: param?.id ? Number(param.id) : req.user.id },
+      include: [{ model: Department, as: "department", include: [Faculty] }],
       attributes: {
-        exclude: ["password", "createdAt", "updatedAt"],
+        exclude: ["password"],
       },
     });
 
@@ -34,13 +36,28 @@ export async function GetUserInfo(req: CustomReqType, res: Response) {
       return res.status(404).json({ status: ErrorCode("Not Found") });
     }
 
-    const res_data: Usertype = {
-      ...(user as Usertype),
-    };
-
-    return res.status(200).json({ data: res_data });
+    return res.status(200).json({ data: user });
   } catch (error) {
     console.log("Get User Info", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
+
+export async function EditUserInfo_Admin(req: Request, res: Response) {
+  try {
+    const data: Usertype = req.body;
+
+    const updateUser = await User.update(
+      { ...data },
+      { where: { id: data.id } }
+    );
+
+    if (updateUser[0] === 0)
+      return res.status(400).json({ status: ErrorCode("Bad Request") });
+
+    return res.status(200).json({ message: "Update Successfully" });
+  } catch (error) {
+    console.log("Edit User Admin", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
@@ -49,7 +66,7 @@ export async function EditUserInfo(req: CustomReqType, res: Response) {
   try {
     const editdata = req.body as EditUserType;
 
-    const user = await User.findByPk(editdata.id);
+    const user = await User.findByPk(editdata.id ?? req.user.id);
 
     if (!user || !editdata.password) {
       return res.status(404).json({ status: ErrorCode("Not Found") });
@@ -67,12 +84,32 @@ export async function EditUserInfo(req: CustomReqType, res: Response) {
 
     //update user information
 
+    if (editdata.edittype === "other") {
+      await User.update(
+        {
+          date_of_birth: editdata.dateofbirth,
+          phone_number: editdata.phonenumber,
+        },
+        {
+          where: {
+            id: editdata.id ?? req.user.id,
+          },
+        }
+      );
+      return res.status(200).json({ message: "Update Successfully" });
+    }
+
     if (
       editdata.edittype === "Password" &&
       editdata.password &&
       editdata.newpassword
     ) {
       const isPassword = bcrypt.compareSync(editdata.password, user.password);
+      const isValid = PasswordValidate(editdata.newpassword);
+
+      if (isValid.errors.length !== 0) {
+        return res.status(400).json({ message: isValid.errors.join("\n") });
+      }
 
       if (!isPassword)
         res.status(400).json({
@@ -86,6 +123,20 @@ export async function EditUserInfo(req: CustomReqType, res: Response) {
         { password: hashednewPassword },
         { where: { id: req.user.id } }
       );
+
+      const refreshToken =
+        req.cookies[process.env.REFRESHTOKEN_COOKIENAME as string];
+
+      await Usersession.destroy({
+        where: {
+          [Op.and]: [
+            {
+              id: req.user.id,
+            },
+            { session_id: { [Op.not]: refreshToken } },
+          ],
+        },
+      });
     }
     if (role === "LIBRARIAN") {
       if (editdata.edittype === "AdminName") {
@@ -142,15 +193,29 @@ export async function DeleteUser(req: CustomReqType, res: Response) {
 }
 
 export async function DeleteMultipleUser(req: Request, res: Response) {
+  const { uid }: { uid: number[] } = req.body;
+
   try {
-    const { uid }: { uid: number[] } = req.body;
+    // Start a transaction
+    await sequelize.transaction(async (transaction) => {
+      // Perform all deletions within the transaction
+      await BorrowBook.destroy({
+        where: { userId: { [Op.in]: uid } },
+        transaction,
+      });
+      await LibraryEntry.destroy({
+        where: { userId: { [Op.in]: uid } },
+        transaction,
+      });
+      await Usersession.destroy({
+        where: { userId: { [Op.in]: uid } },
+        transaction,
+      });
+      await User.destroy({ where: { id: { [Op.in]: uid } }, transaction });
+    });
 
-    await BorrowBook.destroy({ where: { userId: { [Op.in]: uid } } });
-    await LibraryEntry.destroy({ where: { userId: { [Op.in]: uid } } });
-    await Usersession.destroy({ where: { userId: { [Op.in]: uid } } });
-    await User.destroy({ where: { id: { [Op.in]: uid } } });
-
-    return res.status(200);
+    // Send a success response
+    return res.status(200).json({ status: "success" });
   } catch (error) {
     console.log("Delete Multiple User", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
@@ -186,7 +251,7 @@ export async function ForgotPassword(req: Request, res: Response) {
         await SendEmail(
           email,
           "Reset Password",
-          html.replace("{code}", generatedCode)
+          html.replace(":code:", generatedCode)
         );
         break;
 

@@ -11,6 +11,7 @@ import Usersession from "../models/usersession.model";
 import LibraryEntry from "../models/libraryentry.model";
 import Bucket from "../models/bucket.model";
 import BookBucket from "../models/bookbucket.model";
+import Faculty from "../models/faculty.model";
 
 const sequelize = new Sequelize({
   dialect: "postgres",
@@ -29,6 +30,7 @@ sequelize.addModels([
   BorrowBook,
   User,
   Department,
+  Faculty,
   Usersession,
   LibraryEntry,
 ]);

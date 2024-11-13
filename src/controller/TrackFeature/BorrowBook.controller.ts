@@ -10,8 +10,9 @@ import sequelize from "../../config/database";
 import Book from "../../models/book.model";
 import { Op } from "sequelize";
 import User from "../../models/user.model";
-import Bucket from "../../models/bucket.model";
+import Bucket, { BucketStatus } from "../../models/bucket.model";
 import BookBucket from "../../models/bookbucket.model";
+import Category from "../../models/category.model";
 
 export default async function BorrowBookHandler(
   req: CustomReqType,
@@ -21,19 +22,12 @@ export default async function BorrowBookHandler(
   try {
     const data = req.body as { bucketId: number };
 
-    if (data.bucketId)
+    if (!data.bucketId)
       return res.status(400).json({ status: ErrorCode("Bad Request") });
 
     const bucket = await Bucket.findByPk(data.bucketId, {
       transaction,
-      include: {
-        model: Book,
-        as: "books",
-        required: true,
-      },
-      attributes: {
-        include: ["books"],
-      },
+      include: [Book],
     });
 
     if (!bucket)
@@ -54,7 +48,15 @@ export default async function BorrowBookHandler(
     } while (!isCodeUnique);
 
     // Generate QR Code and upload it to storage
-    const QrCodeBuffer = await QRCode.toBuffer(generatedCode, { type: "png" });
+    const QrCodeBuffer = await QRCode.toBuffer(generatedCode, {
+      type: "png",
+      color: {
+        dark: "#00F", // Blue dots
+        light: "#0000", // Transparent background
+      },
+      width: 280,
+      scale: 1,
+    });
     const qrCodeUrl = await UploadToStorage(
       QrCodeBuffer,
       `QR_${generatedCode}`
@@ -76,26 +78,11 @@ export default async function BorrowBookHandler(
     });
 
     await Bucket.update(
-      { borrowbookId: createdBorrowBook.id },
+      { borrowbookId: createdBorrowBook.id, status: BucketStatus.CHECKOUT },
       { where: { id: data.bucketId }, transaction }
     );
 
     // Update all books
-
-    for (const book of bucket.books) {
-      await Book.update(
-        {
-          status: BookStatus.UNAVAILABLE,
-          borrow_count: book.borrow_count ?? 0 + 1,
-        },
-        {
-          where: {
-            id: book.id,
-          },
-          transaction,
-        }
-      );
-    }
 
     await transaction.commit();
 
@@ -124,27 +111,59 @@ export async function BorrowBookPickUpAndReturn(
   try {
     const data = req.body as EditBorrowBookType;
 
-    const borrowedbook = await BorrowBook.findOne({
-      where: { borrow_id: data.borrowId },
+    let borrowedbook = await BorrowBook.findOne({
+      where:
+        data.type === "pickup"
+          ? { borrow_id: data.borrowId }
+          : {
+              [Op.and]: [
+                { userId: data.borrowId },
+                { status: BookStatus.PICKEDUP },
+              ],
+            },
       include: [
         {
           model: Bucket,
           as: "bucket",
           required: true,
-          include: [{ model: Book, as: "books" }],
+          include: [{ model: Book }],
         },
         {
           model: User,
-          as: "user",
-          required: true,
         },
       ],
       transaction,
     });
 
     if (!borrowedbook) {
-      await transaction.rollback();
-      return res.status(404).json({ status: ErrorCode("Not Found") });
+      const user = await User.findOne({
+        where: { studentID: data.borrowId },
+        include: [
+          {
+            model: BorrowBook,
+            where: {
+              status: {
+                [Op.notIn]: [BookStatus.RETURNED, BookStatus.TOPICKUP],
+              },
+            },
+            include: [
+              {
+                model: Bucket,
+                include: [{ model: Book }],
+              },
+            ],
+          },
+        ],
+      });
+
+      if (!user) {
+        await transaction.rollback();
+        return res.status(404).json({ status: ErrorCode("Not Found") });
+      }
+
+      if (user.borrowbooks) {
+        borrowedbook = user.borrowbooks[0] as any;
+      }
     }
 
     switch (data.type) {
@@ -158,34 +177,16 @@ export async function BorrowBookPickUpAndReturn(
           { where: { borrow_id: data.borrowId }, transaction }
         );
 
-        if (borrowedbook.qrcode) {
+        if (borrowedbook?.qrcode) {
           await DeleteFromStorage(borrowedbook.qrcode);
         }
 
         await transaction.commit();
 
-        return res.status(200).json({
-          borrow_id: borrowedbook.borrow_id,
-          borrow_date: date,
-          expect_return_date: nextWeek,
-          student: {
-            fullname: `${borrowedbook.user.lastname} ${borrowedbook.user.firstname}`,
-            ID: borrowedbook.user.studentID,
-            department: borrowedbook.user.department,
-          },
-          Books: borrowedbook.bucket.books,
-        });
+        return res.status(200).json({ data: borrowedbook });
 
       case "return":
-        await BorrowBook.update(
-          {
-            status: BookStatus.RETURNED,
-            return_date: date,
-          },
-          { where: { borrow_id: data.borrowId }, transaction }
-        );
-
-        const bookIds = borrowedbook.bucket.books.map((book) => book.id);
+        const bookIds = borrowedbook?.bucket.books.map((book) => book.id);
         await Book.update(
           { status: BookStatus.AVAILABLE },
           {
@@ -196,6 +197,16 @@ export async function BorrowBookPickUpAndReturn(
             },
             transaction,
           }
+        );
+
+        await BookBucket.update(
+          { returndate: new Date() },
+          { where: { bookId: { [Op.in]: bookIds } } }
+        );
+
+        await BorrowBook.update(
+          { status: BookStatus.RETURNED },
+          { where: { borrow_id: borrowedbook?.borrow_id } }
         );
 
         await transaction.commit();
@@ -220,21 +231,17 @@ export async function HandleManualReturn(req: CustomReqType, res: Response) {
   const transaction = await sequelize.transaction();
 
   try {
-    const { borrowId, bookId }: { borrowId: string; bookId: number[] } =
-      req.body;
+    const { borrowId, bookId }: { borrowId: string; bookId: number } = req.body;
 
     if (!borrowId || !bookId) {
       return res.status(400).json({ status: ErrorCode("Bad Request") });
     }
 
-    const borrowedBook = await BorrowBook.findOne({
-      where: { borrow_id: borrowId },
+    const borrowedBook = await BorrowBook.findByPk(borrowId, {
       include: [
         {
           model: Bucket,
-          as: "bucket",
-          required: true,
-          include: [{ model: Book, as: "books" }],
+          include: [{ model: Book }],
         },
       ],
       transaction,
@@ -247,38 +254,34 @@ export async function HandleManualReturn(req: CustomReqType, res: Response) {
         .json({ message: "Ivalid BorrowId", status: ErrorCode("Not Found") });
     }
 
-    //update borrowbook status
-
-    const unavailableBook = borrowedBook.bucket.books.filter(
-      (book) => book.status === BookStatus.UNAVAILABLE
-    );
-    const availablebook = borrowedBook.bucket.books.filter(
-      (i) => i.status === BookStatus.AVAILABLE
-    );
-    const updatedstatus =
-      unavailableBook.length === 0
-        ? BookStatus.RETURNED
-        : `${BookStatus.RETURNED} ${
-            availablebook.length - unavailableBook.length
-          }`;
-
-    await BorrowBook.update(
-      { status: updatedstatus },
-      { where: { id: borrowId }, transaction }
-    );
-
     //update returned book status
 
     await Book.update(
-      { status: BookStatus.AVAILABLE, return_date: new Date() },
+      { status: BookStatus.AVAILABLE },
       {
         where: {
-          id: {
-            [Op.in]: bookId,
-          },
+          id: bookId,
         },
         transaction,
       }
+    );
+
+    await BookBucket.update({ returndate: new Date() }, { where: { bookId } });
+
+    //update borrowbook status
+    const bookreturnedcount =
+      borrowedBook.bucket.books.filter(
+        (i) => i.status === BookStatus.UNAVAILABLE
+      ).length - 1;
+
+    await BorrowBook.update(
+      {
+        status:
+          bookreturnedcount <= 0
+            ? BookStatus.RETURNED
+            : `${BookStatus.RETURNED} ${bookreturnedcount}`,
+      },
+      { where: { id: borrowId }, transaction }
     );
 
     await transaction.commit();
@@ -291,12 +294,15 @@ export async function HandleManualReturn(req: CustomReqType, res: Response) {
 }
 
 export async function DeleteBorrow_Book(req: Request, res: Response) {
+  const { id }: { id: string[] } = req.body;
+
+  if (!id || id.length === 0) {
+    return res.status(400).json({ status: ErrorCode("Bad Request") });
+  }
+
   const transaction = await sequelize.transaction();
   try {
-    const { id }: { id: string[] } = req.body;
-    if (!id) return res.status(400).json({ status: ErrorCode("Bad Request") });
-
-    const borrowbook = await BorrowBook.findAll({
+    const borrowbooks = await BorrowBook.findAll({
       where: { id: { [Op.in]: id } },
       transaction,
       include: [
@@ -309,49 +315,47 @@ export async function DeleteBorrow_Book(req: Request, res: Response) {
       ],
     });
 
-    if (!borrowbook) {
+    if (!borrowbooks || borrowbooks.length === 0) {
       await transaction.rollback();
       return res.status(404).json({ status: ErrorCode("Not Found") });
     }
 
-    for (const borrow of borrowbook) {
-      if (borrow.status !== BookStatus.RETURNED) {
-        await Book.update(
-          { status: BookStatus.AVAILABLE },
-          {
-            where: {
-              [Op.and]: [
-                {
-                  id: {
-                    [Op.in]: borrow.bucket.books.map((i) => i.id),
-                  },
-                },
-                { status: BookStatus.UNAVAILABLE },
-              ],
-            },
-            transaction,
-          }
-        );
-      }
+    // Collect all book IDs to update, where the book status is currently unavailable
+    const bookIdsToUpdate = borrowbooks.flatMap((borrow) =>
+      borrow.status !== BookStatus.RETURNED
+        ? borrow.bucket.books
+            .filter((book) => book.status === BookStatus.UNAVAILABLE)
+            .map((book) => book.id)
+        : []
+    );
+
+    if (bookIdsToUpdate.length > 0) {
+      await Book.update(
+        { status: BookStatus.AVAILABLE },
+        {
+          where: { id: { [Op.in]: bookIdsToUpdate } },
+          transaction,
+        }
+      );
     }
 
+    // Delete related records in bulk
+    const bucketIds = borrowbooks.map((borrow) => borrow.bucket.id);
     await BookBucket.destroy({
-      where: { bucketId: { [Op.in]: borrowbook.map((i) => i.bucket.id) } },
+      where: { bucketId: { [Op.in]: bucketIds } },
       transaction,
     });
     await Bucket.destroy({
-      where: { id: { [Op.in]: borrowbook.map((i) => i.bucket.id) } },
+      where: { id: { [Op.in]: bucketIds } },
       transaction,
     });
-    await BorrowBook.destroy({
-      where: { borrow_id: { [Op.in]: id } },
-      transaction,
-    });
+    await BorrowBook.destroy({ where: { id: { [Op.in]: id } }, transaction });
+
     await transaction.commit();
     return res.status(200).json({ message: "Delete Successfully" });
   } catch (error) {
     await transaction.rollback();
-    console.log("Delete BorrowBook", error);
+    console.error("Delete BorrowBook Error:", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }

@@ -1,20 +1,79 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { CustomReqType, Role } from "../../Types/AuthenticationType";
 import ErrorCode from "../../Utilities/ErrorCode";
 import BorrowBook from "../../models/borrowbook.model";
 import User from "../../models/user.model";
 import Book from "../../models/book.model";
-import { BookStatus, BorrowBookReturnType } from "../../Types/BookType";
+import { BookStatus } from "../../Types/BookType";
 import {
   formatDateToMMDDYYYYHHMMSS,
   paginateArray,
 } from "../../Utilities/Helper";
 import Bucket from "../../models/bucket.model";
 import { Op } from "sequelize";
+import { isNumeric } from "validator";
+import Department from "../../models/department.model";
+import Faculty from "../../models/faculty.model";
+import Category from "../../models/category.model";
+
+export async function ScanBorrowBook(req: Request, res: Response) {
+  try {
+    const { bid }: { bid?: string } = req.query;
+
+    if (!bid) return res.status(400).json({ status: ErrorCode("Bad Request") });
+
+    const borrow = await BorrowBook.findOne({
+      where: {
+        borrow_id: bid,
+        status: {
+          [Op.not]: BookStatus.RETURNED,
+        },
+      },
+      include: [
+        { model: Bucket, include: [{ model: Book, include: [Category] }] },
+        {
+          model: User,
+        },
+      ],
+    });
+
+    if (!borrow) {
+      const byuser = await User.findOne({
+        where: { studentID: bid },
+        include: [
+          {
+            model: BorrowBook,
+            include: [
+              {
+                model: Bucket,
+                include: [{ model: Book, include: [Category] }],
+              },
+              {
+                model: User,
+              },
+            ],
+          },
+        ],
+      });
+
+      if (!byuser || !byuser.borrowbooks || byuser.borrowbooks.length === 0)
+        return res.status(404).json({
+          message: "No Borrow Book Request Found",
+          status: ErrorCode("Not Found"),
+        });
+
+      return res.status(200).json({ data: byuser.borrowbooks[0] });
+    }
+
+    return res.status(200).json({ data: borrow });
+  } catch (error) {
+    console.log("scan borrowbook", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
 
 export async function GetBorrowBook(req: CustomReqType, res: Response) {
-  let result: { data: BorrowBookReturnType[]; totalcount: number } | null =
-    null;
+  let result: { data: any; totalcount: number } | null = null;
   try {
     const {
       type,
@@ -22,6 +81,7 @@ export async function GetBorrowBook(req: CustomReqType, res: Response) {
       page = 1,
       status,
       search,
+      detailtype,
     } = req.query as unknown as {
       type?: Role;
       limit?: string;
@@ -29,30 +89,28 @@ export async function GetBorrowBook(req: CustomReqType, res: Response) {
       filter?: boolean;
       status?: string;
       search?: string;
+      detailtype?: string;
     };
 
     const [p, lt] = [
       parseInt((page ?? "1") as string),
       parseInt(limit as string),
     ];
+
     switch (type) {
       case "STUDENT":
         result = await GetBorrowBook_STUDENT(
-          req.user.studentID as string,
+          req.user.uid as string,
           req.user.id as number,
           lt,
           p,
           status as BookStatus,
-          search
+          search,
+          detailtype as never
         );
         break;
       case "LIBRARIAN":
-        result = await GetBorrowBook_Librarian(
-          lt,
-          p,
-          status as BookStatus,
-          search
-        );
+        result = await GetBorrowBook_Librarian(lt, p, status as any, search);
         break;
 
       default:
@@ -71,6 +129,45 @@ export async function GetBorrowBook(req: CustomReqType, res: Response) {
   }
 }
 
+export const GetBorrowBookDetail = async (
+  req: CustomReqType,
+  res: Response
+) => {
+  try {
+    const query: { borrowid?: string; ty?: "book" | "user" } = req.query;
+
+    if (
+      !query.borrowid ||
+      !isNumeric(query.borrowid) ||
+      !query.ty ||
+      (query.ty !== "book" && query.ty !== "user")
+    ) {
+      return res.status(400).json({ status: ErrorCode("Bad Request") });
+    }
+
+    const result = await BorrowBook.findByPk(Number(query.borrowid), {
+      include:
+        query.ty === "book"
+          ? [{ model: Bucket, include: [{ model: Book, include: [Category] }] }]
+          : [
+              {
+                model: User,
+                include: [{ model: Department, include: [Faculty] }],
+              },
+            ],
+    });
+
+    if (!result)
+      return res.status(404).json({ status: ErrorCode("Not Found") });
+
+    const data = query.ty === "book" ? result.bucket.books : result.user;
+    return res.status(200).json({ data });
+  } catch (error) {
+    console.log("Get BorrowBook Detail", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+};
+
 //Helper Function
 export const GetBorrowBook_Librarian = async (
   limit: number,
@@ -84,48 +181,32 @@ export const GetBorrowBook_Librarian = async (
       ...(status || search
         ? {
             where: {
-              status,
-              borrow_id: {
-                [Op.contained]: search,
-              },
+              [Op.and]: [
+                { ...(search && { borrow_id: { [Op.like]: `%${search}%` } }) },
+                {
+                  ...(status && {
+                    status: {
+                      [Op.like]: {
+                        [Op.any]: status?.split(",") as string[],
+                      },
+                    },
+                  }),
+                },
+              ],
             },
           }
         : {}),
-      include: [
-        {
-          model: Bucket,
-          as: "bucket",
-        },
-        { model: User, as: "user" },
-      ],
       limit,
       offset: (page - 1) * limit,
     });
-
     //Pepare For Return Data
-    const result: Array<BorrowBookReturnType> = borrow_book.map((item) => {
-      return {
-        borrow_id: item.borrow_id,
-        borrow_date: item.createdAt,
-        user: {
-          firstname: item.user.firstname,
-          lastname: item.user.lastname,
-          email: item.user.email,
-          role: item.user.role,
-          studentID: item.user.studentID,
-        },
-        Books: item.bucket.books,
-        status: item.status,
-        expect_return_date: item.expect_return_date,
-        qrcode: item.qrcode,
-        retrun_date: item.return_date
-          ? formatDateToMMDDYYYYHHMMSS(item.return_date)
-          : undefined,
-        updatedAt: item.updatedAt,
-      };
-    });
-
-    return { data: result, totalcount: borrow_bookcount };
+    return {
+      data: borrow_book.map((borrow) => ({
+        ...borrow.dataValues,
+        createdAt: formatDateToMMDDYYYYHHMMSS(borrow.dataValues.createdAt),
+      })),
+      totalcount: borrow_bookcount,
+    };
   } catch (error) {
     throw error;
   }
@@ -137,7 +218,8 @@ export const GetBorrowBook_STUDENT = async (
   limit: number,
   page: number,
   status?: BookStatus,
-  search?: string
+  search?: string,
+  ty?: "book"
 ) => {
   try {
     const borrow_book_count = await BorrowBook.count({ where: { userId: id } });
@@ -146,7 +228,6 @@ export const GetBorrowBook_STUDENT = async (
       include: [
         {
           model: BorrowBook,
-          as: "borrowbooks",
           ...(status || search
             ? {
                 where: {
@@ -157,26 +238,31 @@ export const GetBorrowBook_STUDENT = async (
                 },
               }
             : {}),
-          include: [
-            {
-              model: Bucket,
-              as: "buckets",
-              include: [
-                {
-                  model: Book,
-                  as: "books",
-                  attributes: {
-                    exclude: [
-                      "description",
-                      "borrow_count",
-                      "createdAt",
-                      "updatedAt",
-                    ],
+
+          attributes: {
+            exclude: ["userId"],
+          },
+
+          ...(ty === "book" && {
+            include: [
+              {
+                model: Bucket,
+                include: [
+                  {
+                    model: Book,
+                    attributes: {
+                      exclude: [
+                        "description",
+                        "borrow_count",
+                        "createdAt",
+                        "updatedAt",
+                      ],
+                    },
                   },
-                },
-              ],
-            },
-          ],
+                ],
+              },
+            ],
+          }),
         },
       ],
       attributes: {
@@ -192,23 +278,11 @@ export const GetBorrowBook_STUDENT = async (
       limit
     );
 
-    const transformedData: BorrowBookReturnType[] = paginationBorrowBook.map(
-      (borrow) => ({
-        borrow_id: borrow.borrow_id,
-        Books: borrow.bucket.books, // Books are included directly
-        borrow_date: borrow.createdAt, // Assuming 'createdAt' is the borrow date
-        status: borrow.status,
-        expect_return_date: borrow.expect_return_date,
-        qrcode: borrow.qrcode,
-        return_date: borrow.return_date
-          ? borrow.return_date.toISOString()
-          : undefined, // Optional field
-        updatedAt: borrow.updatedAt as Date, // Last updated date
-      })
-    );
-
     return {
-      data: transformedData,
+      data: paginationBorrowBook.map((borrow) => ({
+        ...borrow.dataValues,
+        createdAt: formatDateToMMDDYYYYHHMMSS(borrow.dataValues.createdAt),
+      })),
       totalcount: borrow_book_count,
     };
   } catch (error) {

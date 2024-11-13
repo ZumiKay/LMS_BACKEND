@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 
 import Router from "./Router";
 import { configDotenv } from "dotenv";
+import cors from "cors";
 import { getgooglebook } from "./controller/Admin/Book.controller";
 
 configDotenv();
@@ -12,10 +13,17 @@ configDotenv();
 const app = express();
 const port = process.env.PORT || 4000;
 
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(morgan("dev"));
 app.use(express.query({}));
 app.use(express.json());
 app.use(express.text());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use("/api", Router);
@@ -34,16 +42,16 @@ app.post("/api/data", (req: Request, res: Response) => {
   }
 });
 
-// app.get("/getbook", async (req: Request, res: Response) => {
-//   const get = await getgooglebook("Adventure");
-//   if (get.success) {
-//     console.log("Got Google Book");
-//   } else {
-//     console.log("Error");
-//   }
+app.get("/getbook", async (req: Request, res: Response) => {
+  const get = await getgooglebook("Science fiction");
+  if (get.success) {
+    console.log("Got Google Book");
+  } else {
+    console.log("Error");
+  }
 
-//   res.status(200).send("Get Book");
-// });
+  res.status(200).send({ get });
+});
 
 app.listen(port, () => {
   InitalStartSever();

@@ -18,6 +18,7 @@ declare namespace NodeJS {
     EMAIL_KEY: string;
     EMAIL: string;
     BLOB_READ_WRITE_TOKEN: string;
+    PARAGONIU_URL: string;
     PORT?: string;
   }
 }

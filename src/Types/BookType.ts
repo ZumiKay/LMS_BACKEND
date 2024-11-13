@@ -9,6 +9,9 @@ export interface GetBookType {
   search?: string;
   popular?: boolean;
   latest?: boolean;
+  cate?: string;
+  status?: string;
+  cates?: string;
 }
 
 export interface ISBN_OBJ {
@@ -22,6 +25,7 @@ export enum BookStatus {
   RETURNED = "Returned",
   AVAILABLE = "Available",
   UNAVAILABLE = "Unavailable",
+  EXPIRED = "Expired",
 }
 
 export interface EditBorrowBookType {
@@ -32,12 +36,11 @@ export interface EditBorrowBookType {
 export interface BorrowBookReturnType {
   borrow_id: string;
   Books: Book[];
-  borrow_date: Date;
   user?: Pick<User, "firstname" | "lastname" | "email" | "studentID">;
   status: string;
   expect_return_date: Date | null;
   qrcode: string | null;
-  retrun_date?: string;
+  return_date?: Date;
   updatedAt: Date;
 }
 
@@ -52,7 +55,7 @@ export interface BookBucketType {
 }
 
 export interface DeleteBookBucketType {
-  bookId: number;
+  bookId: number[];
   bucketId: number;
   all?: boolean;
 }

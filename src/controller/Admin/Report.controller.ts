@@ -93,7 +93,7 @@ export async function ExportReport(req: Request, res: Response) {
       return {
         ID: studentID,
         fullname: `${firstname} ${lastname}`,
-        faculty: department.faculty,
+        faculty: department.faculty.name,
         department: department.department,
         email,
         phone_number,

@@ -1,5 +1,11 @@
 import { InferAttributes, InferCreationAttributes } from "sequelize";
-import { Column, ForeignKey, Model, Table } from "sequelize-typescript";
+import {
+  Column,
+  DataType,
+  ForeignKey,
+  Model,
+  Table,
+} from "sequelize-typescript";
 import Bucket from "./bucket.model";
 import Book from "./book.model";
 
@@ -15,6 +21,9 @@ class BookBucket extends Model<
   @ForeignKey(() => Book)
   @Column
   bookId: number;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  returndate: Date | null;
 }
 
 export default BookBucket;

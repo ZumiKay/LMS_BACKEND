@@ -17,6 +17,7 @@
     "@vercel/blob": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
@@ -27,6 +28,7 @@
     "pg": "^8.13.0",
     "pg-hstore": "^2.3.4",
     "qrcode": "^1.5.4",
+    "qrcode-with-logos": "^1.1.1",
     "reflect-metadata": "^0.2.2",
     "sequelize": "^6.37.3",
     "sequelize-typescript": "^2.1.6"
@@ -37,6 +39,7 @@
     "@babel/preset-typescript": "^7.25.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.7",
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.13",
     "@types/jsonwebtoken": "^9.0.7",

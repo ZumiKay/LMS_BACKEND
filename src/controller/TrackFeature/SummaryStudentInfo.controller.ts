@@ -146,41 +146,47 @@ function countEntriesAndBorrowedBooksBySemesterAndSelected(
   borrowedbook: Date[][],
   selecteddaterange: FilterSummaryStudentType[]
 ) {
-  let result = {};
+  console.log(selecteddaterange);
+  const result: Record<
+    string,
+    {
+      entry: { total: number; monthly: Record<string, any> };
+      borrowedbook: { total: number; monthly: Record<string, any> };
+    }
+  > = {};
 
-  selecteddaterange.forEach((i) => {
-    const entry_date = filterDatesArrayByRange(
-      entries,
-      i.filter.start,
-      i.filter.end
+  selecteddaterange.forEach((range) => {
+    // Filter both entries and borrowed book data by date range
+    const filteredEntries = filterByUniqueDate(
+      filterDatesArrayByRange(entries, range.filter.start, range.filter.end)
     );
-    const borrow_id = filterDatesArrayByRange(
-      borrowedbook,
-      i.filter.start,
-      i.filter.end
+    const filteredBorrowedBooks = filterByUniqueDate(
+      filterDatesArrayByRange(
+        borrowedbook,
+        range.filter.start,
+        range.filter.end
+      )
     );
-    const filteredentry = filterByUniqueDate(entry_date);
-    const filteredborrowed = filterByUniqueDate(borrow_id);
 
-    result = {
-      ...result,
-      [i.name]: {
-        entry: {
-          total: countNonEmptySubArrays(filteredentry),
-          monthly: countMonthsInRange(
-            filteredentry,
-            i.filter.start,
-            i.filter.end
-          ),
-        },
-        borrowedbook: {
-          total: countNonEmptySubArrays(filteredborrowed),
-          monthly: countMonthsInRange(
-            filteredborrowed,
-            i.filter.start,
-            i.filter.end
-          ),
-        },
+    console.log(filteredEntries);
+
+    // Calculate totals and monthly breakdowns
+    result[range.name] = {
+      entry: {
+        total: countNonEmptySubArrays(filteredEntries),
+        monthly: countMonthsInRange(
+          filteredEntries,
+          range.filter.start,
+          range.filter.end
+        ),
+      },
+      borrowedbook: {
+        total: countNonEmptySubArrays(filteredBorrowedBooks),
+        monthly: countMonthsInRange(
+          filteredBorrowedBooks,
+          range.filter.start,
+          range.filter.end
+        ),
       },
     };
   });
@@ -190,7 +196,7 @@ function countEntriesAndBorrowedBooksBySemesterAndSelected(
 
 export default async function SummaryStudentUsage(req: Request, res: Response) {
   try {
-    const { department, filtervalue } = req.body() as SummaryStudentParamType;
+    const { department, filtervalue } = req.body as SummaryStudentParamType;
     if (!department || !filtervalue) {
       return res.status(400).json({ status: ErrorCode("Bad Request") });
     }
@@ -205,7 +211,6 @@ export default async function SummaryStudentUsage(req: Request, res: Response) {
           include: [
             {
               model: LibraryEntry,
-              as: "entries",
             },
             { model: BorrowBook, as: "borrowbooks" },
           ],
@@ -249,7 +254,13 @@ export default async function SummaryStudentUsage(req: Request, res: Response) {
     const result = countEntriesAndBorrowedBooksBySemesterAndSelected(
       library_entry,
       borrowbooks,
-      filtervalue
+      filtervalue.map((i) => ({
+        ...i,
+        filter: {
+          start: new Date(i.filter.start),
+          end: new Date(i.filter.end),
+        },
+      }))
     );
 
     return res.status(200).json({ data: result });

@@ -3,17 +3,64 @@ import Department from "../../models/department.model";
 import ErrorCode from "../../Utilities/ErrorCode";
 import sequelize from "../../config/database";
 import User from "../../models/user.model";
+import Faculty from "../../models/faculty.model";
+
+export async function CreateFaculty(req: Request, res: Response) {
+  try {
+    const data = req.body as { name: string[] };
+
+    if (!data.name)
+      return res.status(400).json({ status: ErrorCode("Bad Request") });
+
+    await Promise.all(
+      data.name.map((name) =>
+        Faculty.findOrCreate({ where: { name }, defaults: { name } })
+      )
+    );
+
+    return res.status(200).json({ message: "Created" });
+  } catch (error) {
+    console.log("Faculty", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
+
+export async function DeleteFaculty(req: Request, res: Response) {
+  try {
+    const data: { name: string } = req.body;
+    await Faculty.destroy({ where: { name: data.name } });
+
+    return res.status(200).json({ message: "Deleted" });
+  } catch (error) {
+    console.log("Delete Faculty", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
 
 export async function CreateDepartment(req: Request, res: Response) {
   try {
-    const data = req.body as Department;
+    const data = req.body as { faculty: { name: string }; department: string };
 
     if (!data.faculty || !data.department)
       return res.status(400).json({ status: ErrorCode("Bad Request") });
 
+    const faculty = await Faculty.findOne({
+      where: { name: data.faculty.name },
+    });
+    const isDep = await Department.findOne({
+      where: { department: data.department },
+    });
+
+    if (isDep) {
+      return res.status(400).json({
+        message: "Department Exist",
+        status: ErrorCode("Bad Request"),
+      });
+    }
+
     await Department.create({
-      faculty: data.faculty,
       department: data.department,
+      facultyID: faculty?.id,
     });
 
     return res.status(200).json({ message: "Create Successfully" });
@@ -23,22 +70,33 @@ export async function CreateDepartment(req: Request, res: Response) {
   }
 }
 
-interface EditDepartmentType extends Department {
-  id: number;
-}
 export async function EditDepartment(req: Request, res: Response) {
   try {
-    const data = req.body as EditDepartmentType;
+    const { id, faculty, department } = req.body;
 
-    if (!data.id || !data.faculty || !data.department)
+    if (!id || !faculty || !department) {
       return res.status(400).json({ status: ErrorCode("Bad Request") });
+    }
 
-    await Department.update(
-      { faculty: data.faculty, department: data.department },
-      { where: { id: data.id } }
-    );
+    // Find the existing department
+    const existingDepartment = await Department.findByPk(id);
+    if (!existingDepartment) {
+      return res.status(404).json({ status: ErrorCode("Not Found") });
+    }
+
+    const [facultyRecord] = await Faculty.findOrCreate({
+      where: { name: faculty },
+      defaults: { name: faculty },
+    });
+
+    // Update the department
+    existingDepartment.department = department;
+    existingDepartment.facultyID = facultyRecord.id;
+    await existingDepartment.save();
+
+    return res.status(200).json({ message: "Update Successfully" });
   } catch (error) {
-    console.log("Edit Department", error);
+    console.error("Edit Department", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
@@ -46,20 +104,33 @@ export async function EditDepartment(req: Request, res: Response) {
 export async function DeleteDepartment(req: Request, res: Response) {
   const transaction = await sequelize.transaction();
   try {
-    const data: { id: number } = req.body;
+    const { id } = req.body;
 
-    if (!data.id)
+    if (!id) {
       return res.status(400).json({ status: ErrorCode("Bad Request") });
-
-    const users = await User.findAll({ where: { departmentID: data.id } });
-
-    for (const { id } of users) {
-      await User.update({ departmentID: null }, { where: { id }, transaction });
     }
+
+    // Check if the department exists
+    const department = await Department.findByPk(id);
+    if (!department) {
+      return res.status(404).json({ status: ErrorCode("Not Found") });
+    }
+
+    // Find all users associated with this department
+    const users = await User.findAll({ where: { departmentID: id } });
+
+    // Set departmentID to null for each user
+    for (const user of users) {
+      await user.update({ departmentID: null }, { transaction });
+    }
+
+    // Delete the department
+    await Department.destroy({ where: { id }, transaction });
+
     await transaction.commit();
     return res.status(200).json({ message: "Delete Successfully" });
   } catch (error) {
-    console.log("Delete Department", error);
+    console.error("Delete Department", error);
     await transaction.rollback();
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
@@ -67,19 +138,9 @@ export async function DeleteDepartment(req: Request, res: Response) {
 
 export async function GetDepartment(req: Request, res: Response) {
   try {
-    const data = req.query as { ty: "fac" | "dep" };
+    const data = await Faculty.findAll({ include: [Department] });
 
-    const deparments = await Department.findAll();
-
-    let result: any;
-
-    if (data.ty === "dep") {
-      result = deparments;
-    } else if (data.ty === "fac") {
-      result = deparments.map(({ faculty }) => faculty);
-    }
-
-    return res.status(200).json({ data: result });
+    return res.status(200).json({ data });
   } catch (error) {
     console.log("Get Department", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });

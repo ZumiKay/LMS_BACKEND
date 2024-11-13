@@ -145,14 +145,20 @@ export function filterDatesArrayByRange(
   startDate: Date,
   endDate: Date
 ) {
-  return datesArray
-    .map((subArray) =>
-      subArray
-        .filter((date) => {
-          const currentDate = new Date(date);
-          return currentDate >= startDate && currentDate <= endDate;
-        })
-        .sort((a, b) => a.getTime() - b.getTime())
-    )
-    .filter((subArray) => subArray.length > 0);
+  const start = startDate.getTime();
+  const end = endDate.getTime();
+
+  return datesArray.reduce((result, subArray) => {
+    const filtered = subArray.filter(
+      (date) => date.getTime() >= start && date.getTime() <= end
+    );
+    if (filtered.length > 0) {
+      result.push(filtered);
+    }
+    return result;
+  }, [] as Date[][]);
+}
+
+export function normalizeString(input: string): string {
+  return input.replace(/\s+/g, "").toLowerCase();
 }

@@ -1,6 +1,5 @@
 import {
   BelongsTo,
-  BelongsToMany,
   Column,
   CreatedAt,
   ForeignKey,
@@ -8,7 +7,6 @@ import {
   Model,
   Table,
 } from "sequelize-typescript";
-import Book from "./book.model";
 import User from "./user.model";
 import { DataTypes, InferAttributes, InferCreationAttributes } from "sequelize";
 import { BookStatus } from "../Types/BookType";

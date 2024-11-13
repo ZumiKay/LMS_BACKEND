@@ -1,12 +1,17 @@
 import { Response } from "express";
 import { CustomReqType } from "../../Types/AuthenticationType";
 import ErrorCode from "../../Utilities/ErrorCode";
-import { BookBucketType, DeleteBookBucketType } from "../../Types/BookType";
+import {
+  BookBucketType,
+  BookStatus,
+  DeleteBookBucketType,
+} from "../../Types/BookType";
 import Bucket, { BucketStatus } from "../../models/bucket.model";
 import BookBucket from "../../models/bookbucket.model";
 import sequelize from "../../config/database";
 import { Op } from "sequelize";
 import Book from "../../models/book.model";
+import Category from "../../models/category.model";
 
 export default async function CreateCart(req: CustomReqType, res: Response) {
   const transaction = await sequelize.transaction();
@@ -38,12 +43,34 @@ export default async function CreateCart(req: CustomReqType, res: Response) {
       });
     }
 
+    //update book status
+
+    await Book.update(
+      { status: BookStatus.UNAVAILABLE },
+      { where: { id: { [Op.in]: bookIds } } }
+    );
+
     await transaction.commit();
 
     return res.status(200).json({ message: "Added To Bucket" });
   } catch (error) {
     await transaction.rollback();
     console.error("Create Cart Error:", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}
+
+export async function CountBucketItems(req: CustomReqType, res: Response) {
+  try {
+    const count = await Bucket.findOne({
+      where: {
+        [Op.and]: [{ userId: req.user.id }, { status: BucketStatus.INCART }],
+      },
+      include: [Book],
+    });
+    return res.status(200).json({ data: count?.books.length });
+  } catch (error) {
+    console.log("Count Bucket", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
@@ -61,6 +88,7 @@ export async function GetBucket(req: CustomReqType, res: Response) {
         model: Book,
         as: "books",
         required: true,
+        include: [Category],
         attributes: {
           exclude: [
             "return_date",
@@ -166,18 +194,23 @@ export async function DeleteBuckets(req: CustomReqType, res: Response) {
       await BookBucket.destroy({ where: { bucketId: data.bucketId } });
       await Bucket.destroy({ where: { id: data.bucketId } });
     } else {
-      const isEmpty = bucket?.books.length === 0;
+      const isEmpty = bucket?.books.length === 1;
 
-      if (isEmpty) {
-        await Bucket.destroy({ where: { id: data.bucketId } });
-      } else {
-        await BookBucket.destroy({
-          where: {
-            [Op.and]: [{ bookId: data.bookId, bucketId: data.bucketId }],
-          },
-        });
-      }
+      await BookBucket.destroy({
+        where: {
+          [Op.and]: [
+            { bookId: { [Op.in]: data.bookId }, bucketId: data.bucketId },
+          ],
+        },
+      });
+
+      if (isEmpty) await Bucket.destroy({ where: { id: data.bucketId } });
     }
+
+    await Book.update(
+      { status: BookStatus.AVAILABLE },
+      { where: { id: { [Op.in]: data.bookId } } }
+    );
 
     return res.status(200).json({ message: "Delete Success" });
   } catch (error) {

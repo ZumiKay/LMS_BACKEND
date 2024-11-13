@@ -1,7 +1,7 @@
 import { Router as router } from "express";
 import UserRoute from "./User.router";
 import Adminroute from "./Admin.router";
-import { GetBook } from "../controller/Admin/Book.controller";
+import { GetBook, UploadCover } from "../controller/Admin/Book.controller";
 import { GetCategories } from "../controller/Category/Category.controller";
 import { IsHD, VerifyToken } from "../middleware/UserValidate";
 import CreateCart, {
@@ -11,7 +11,7 @@ import CreateCart, {
 } from "../controller/Cart/bookcart.controller";
 import BorrowBookHandler from "../controller/TrackFeature/BorrowBook.controller";
 import {
-  Login,
+  GetUserSession,
   RefreshToken,
 } from "../controller/Authentication/Account.controller";
 import SummaryStudentUsage from "../controller/TrackFeature/SummaryStudentInfo.controller";
@@ -23,9 +23,8 @@ const Router = router();
 Router.use("/user", UserRoute);
 Router.use("/librarian", Adminroute);
 
-//Authentication
-Router.post("/login", Login as any);
-Router.post("/resetpass");
+//check Login Session
+Router.get("/checksession", VerifyToken as any, GetUserSession as any);
 
 //Category
 Router.get("/getallcategory", GetCategories as any);
@@ -44,6 +43,7 @@ Router.post("/checkout", VerifyToken as any, BorrowBookHandler as any);
 
 //Get Book
 Router.get("/getallbook", GetBook as any);
+Router.post("/uploadimg", UploadCover as any);
 
 //Get SummaryInfo
 Router.post("/getsummaryusage", VerifyToken as any, SummaryStudentUsage as any);
