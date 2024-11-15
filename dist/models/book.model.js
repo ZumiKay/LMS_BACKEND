@@ -16,21 +16,24 @@ const sequelize_1 = require("sequelize");
 const sequelize_typescript_1 = require("sequelize-typescript");
 const category_model_1 = __importDefault(require("./category.model"));
 const category_item_model_1 = __importDefault(require("./category_item.model"));
+const bucket_model_1 = __importDefault(require("./bucket.model"));
+const bookbucket_model_1 = __importDefault(require("./bookbucket.model"));
 let Book = class Book extends sequelize_typescript_1.Model {
 };
+__decorate([
+    (0, sequelize_typescript_1.Column)({
+        type: sequelize_1.DataTypes.JSONB,
+        allowNull: false,
+    }),
+    __metadata("design:type", Array)
+], Book.prototype, "ISBN", void 0);
 __decorate([
     (0, sequelize_typescript_1.BelongsToMany)(() => category_model_1.default, () => category_item_model_1.default),
     __metadata("design:type", Array)
 ], Book.prototype, "categories", void 0);
 __decorate([
     (0, sequelize_typescript_1.Column)({
-        type: sequelize_1.DataTypes.JSONB,
-    }),
-    __metadata("design:type", Object)
-], Book.prototype, "ISBN", void 0);
-__decorate([
-    (0, sequelize_typescript_1.Column)({
-        type: sequelize_1.DataTypes.STRING,
+        type: sequelize_1.DataTypes.TEXT,
         allowNull: true,
     }),
     __metadata("design:type", Object)
@@ -43,12 +46,12 @@ __decorate([
     __metadata("design:type", String)
 ], Book.prototype, "title", void 0);
 __decorate([
-    (0, sequelize_typescript_1.Column)({ allowNull: false }),
+    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.TEXT, allowNull: true }),
     __metadata("design:type", Object)
 ], Book.prototype, "description", void 0);
 __decorate([
-    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.JSONB }),
-    __metadata("design:type", Object)
+    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.JSONB, allowNull: false }),
+    __metadata("design:type", Array)
 ], Book.prototype, "author", void 0);
 __decorate([
     sequelize_typescript_1.Column,
@@ -60,8 +63,12 @@ __decorate([
 ], Book.prototype, "status", void 0);
 __decorate([
     (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.INTEGER, allowNull: true, defaultValue: 0 }),
-    __metadata("design:type", Number)
+    __metadata("design:type", Object)
 ], Book.prototype, "borrow_count", void 0);
+__decorate([
+    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.DATE, allowNull: true }),
+    __metadata("design:type", Object)
+], Book.prototype, "return_date", void 0);
 __decorate([
     sequelize_typescript_1.CreatedAt,
     __metadata("design:type", Date)
@@ -70,6 +77,10 @@ __decorate([
     sequelize_typescript_1.UpdatedAt,
     __metadata("design:type", Date)
 ], Book.prototype, "updatedAt", void 0);
+__decorate([
+    (0, sequelize_typescript_1.BelongsToMany)(() => bucket_model_1.default, () => bookbucket_model_1.default),
+    __metadata("design:type", Array)
+], Book.prototype, "buckets", void 0);
 Book = __decorate([
     sequelize_typescript_1.Table
 ], Book);

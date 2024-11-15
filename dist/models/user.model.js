@@ -18,6 +18,7 @@ const usersession_model_1 = __importDefault(require("./usersession.model"));
 const department_model_1 = __importDefault(require("./department.model"));
 const libraryentry_model_1 = __importDefault(require("./libraryentry.model"));
 const borrowbook_model_1 = __importDefault(require("./borrowbook.model"));
+const bucket_model_1 = __importDefault(require("./bucket.model"));
 let User = class User extends sequelize_typescript_1.Model {
 };
 __decorate([
@@ -34,8 +35,8 @@ __decorate([
 ], User.prototype, "studentID", void 0);
 __decorate([
     (0, sequelize_typescript_1.ForeignKey)(() => department_model_1.default),
-    sequelize_typescript_1.Column,
-    __metadata("design:type", Number)
+    (0, sequelize_typescript_1.Column)({ allowNull: true, type: sequelize_1.DataTypes.INTEGER }),
+    __metadata("design:type", Object)
 ], User.prototype, "departmentID", void 0);
 __decorate([
     (0, sequelize_typescript_1.BelongsTo)(() => department_model_1.default),
@@ -46,15 +47,16 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "role", void 0);
 __decorate([
-    (0, sequelize_typescript_1.Column)({ allowNull: true }),
-    __metadata("design:type", Date)
+    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.DATE, allowNull: true }),
+    __metadata("design:type", Object)
 ], User.prototype, "date_of_birth", void 0);
 __decorate([
     (0, sequelize_typescript_1.Column)({
+        type: sequelize_1.DataTypes.STRING,
         allowNull: true,
         unique: true,
     }),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], User.prototype, "phone_number", void 0);
 __decorate([
     (0, sequelize_typescript_1.Column)({
@@ -70,17 +72,25 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "password", void 0);
 __decorate([
+    (0, sequelize_typescript_1.Column)({ allowNull: true, type: sequelize_1.DataTypes.STRING }),
+    __metadata("design:type", Object)
+], User.prototype, "code", void 0);
+__decorate([
     (0, sequelize_typescript_1.HasMany)(() => usersession_model_1.default),
-    __metadata("design:type", Array)
+    __metadata("design:type", Object)
 ], User.prototype, "session", void 0);
 __decorate([
     (0, sequelize_typescript_1.HasMany)(() => libraryentry_model_1.default),
-    __metadata("design:type", Array)
+    __metadata("design:type", Object)
 ], User.prototype, "entries", void 0);
 __decorate([
     (0, sequelize_typescript_1.HasMany)(() => borrowbook_model_1.default),
-    __metadata("design:type", Array)
+    __metadata("design:type", Object)
 ], User.prototype, "borrowbooks", void 0);
+__decorate([
+    (0, sequelize_typescript_1.HasMany)(() => bucket_model_1.default),
+    __metadata("design:type", Object)
+], User.prototype, "buckets", void 0);
 User = __decorate([
     sequelize_typescript_1.Table
 ], User);

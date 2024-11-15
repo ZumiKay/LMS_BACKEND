@@ -14,7 +14,6 @@ import Usersession from "../../models/usersession.model";
 import bcrypt from "bcryptjs";
 import { GenerateRandomCode, getDateWithOffset } from "../../Utilities/Helper";
 import { SendEmail } from "../../config/email";
-import { randomBytes } from "crypto";
 
 interface RegisterType extends Usertype {
   html: string;
@@ -74,32 +73,19 @@ export default async function RegisterUser(req: Request, res: Response) {
 
 export async function Login(req: Request, res: Response) {
   try {
-    const data = req.body as LoginType;
+    const { email, password } = req.body as LoginType;
 
-    if (!data.email || !data.password)
+    if (!email || !password) {
       return res.status(400).json({ message: "Not Allowed", error: 0 });
+    }
 
     const user = await User.findOne({
       where: {
-        [Op.or]: [
-          {
-            email: data.email,
-          },
-          { studentID: data.email },
-        ],
+        [Op.or]: [{ email }, { studentID: email }],
       },
     });
 
-    if (!user) {
-      return res.status(404).json({
-        message: "Wrong Email or Password",
-        error: ErrorCode("Unauthenticated"),
-      });
-    }
-
-    const isUser = bcrypt.compareSync(data.password, user.password);
-
-    if (!isUser) {
+    if (!user || !bcrypt.compareSync(password, user.password)) {
       return res.status(404).json({
         message: "Wrong Email or Password",
         error: ErrorCode("Unauthenticated"),
@@ -111,12 +97,11 @@ export async function Login(req: Request, res: Response) {
       studentID: user.studentID,
       role: user.role,
     };
-
-    const accessTokenExpire = 60 * 60; // 15min
-    const refreshTokenExpire = 2 * 60 * 60; // 1hr
+    const accessTokenExpire = 10 * 60; // 10 minutes
+    const refreshTokenExpire = 2 * 60 * 60; // 2 hours
 
     const AccessToken = generateToken(
-      { id: user.id, uid: user.studentID, role: user.role },
+      TokenPayload,
       process.env.JWT_SECRET as string,
       accessTokenExpire
     );
@@ -126,36 +111,30 @@ export async function Login(req: Request, res: Response) {
       refreshTokenExpire
     );
 
-    //Save Login Session
+    // Save login session
     await Usersession.create({
       session_id: RefreshToken,
       userId: user.id,
       expiredAt: getDateWithOffset(refreshTokenExpire),
     });
 
-    //Removed Expired Session
-    await Usersession.destroy({
-      where: {
-        expiredAt: {
-          [Op.lte]: new Date(),
-        },
-      },
-    });
+    const cookieOptions = {
+      httpOnly: true,
+      sameSite: "lax" as const,
+    };
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, AccessToken, {
-      httpOnly: true,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: accessTokenExpire * 1000,
     });
     res.cookie(process.env.REFRESHTOKEN_COOKIENAME as string, RefreshToken, {
-      httpOnly: true,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: refreshTokenExpire * 1000,
     });
 
     return res.status(200).json({ message: "Logged In" });
   } catch (error) {
-    console.log("Login User", error);
+    console.error("Login User Error:", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
@@ -200,25 +179,39 @@ export async function SignOut(req: CustomReqType, res: Response) {
 export async function RefreshToken(req: CustomReqType, res: Response) {
   try {
     const token = req.cookies[process.env.REFRESHTOKEN_COOKIENAME as string];
+
+    if (!token) {
+      return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    }
+
     const isValid = await Usersession.findOne({
       where: {
         session_id: token,
-        expiredAt: { [Op.lt]: new Date() },
       },
+      include: [
+        {
+          model: User,
+          attributes: {
+            include: ["id", "studentID", "role"],
+          },
+        },
+      ],
     });
 
     if (!isValid) {
       return res.status(401).json({ status: ErrorCode("Unauthenticated") });
     }
+    const accessTokenExpire = 10 * 60; //10 minute
 
     const newToken = generateToken(
-      { ...req.user },
+      {
+        id: isValid.userId,
+        studentID: isValid.user.studentID,
+        role: isValid.user.role,
+      },
       process.env.JWT_SECRET as string,
-      parseInt(process.env.ACCESSTOKEN_LIFE ?? "0")
+      accessTokenExpire
     );
-
-    const accessTokenExpire = 60 * 60; // 15min
-    // 1hr
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, newToken, {
       httpOnly: true,

@@ -35,6 +35,6 @@ UserRoute.get(
   GetBorrowBookDetail as any
 );
 //Token
-UserRoute.get("/refreshtoken", VerifyToken as any, RefreshToken as any);
+UserRoute.get("/refreshtoken", RefreshToken as any);
 
 export default UserRoute;

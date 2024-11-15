@@ -14,27 +14,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const sequelize_1 = require("sequelize");
 const sequelize_typescript_1 = require("sequelize-typescript");
-const user_model_1 = __importDefault(require("./user.model"));
-let Usersession = class Usersession extends sequelize_typescript_1.Model {
+const department_model_1 = __importDefault(require("./department.model"));
+let Faculty = class Faculty extends sequelize_typescript_1.Model {
 };
 __decorate([
-    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.STRING, allowNull: false, unique: true }),
+    sequelize_typescript_1.Column,
     __metadata("design:type", String)
-], Usersession.prototype, "session_id", void 0);
+], Faculty.prototype, "name", void 0);
 __decorate([
-    (0, sequelize_typescript_1.ForeignKey)(() => user_model_1.default),
-    sequelize_typescript_1.Column,
-    __metadata("design:type", Number)
-], Usersession.prototype, "userId", void 0);
+    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.STRING, allowNull: true }),
+    __metadata("design:type", String)
+], Faculty.prototype, "description", void 0);
 __decorate([
-    (0, sequelize_typescript_1.BelongsTo)(() => user_model_1.default),
-    __metadata("design:type", user_model_1.default)
-], Usersession.prototype, "user", void 0);
-__decorate([
-    sequelize_typescript_1.Column,
-    __metadata("design:type", Date)
-], Usersession.prototype, "expiredAt", void 0);
-Usersession = __decorate([
+    (0, sequelize_typescript_1.HasMany)(() => department_model_1.default),
+    __metadata("design:type", Array)
+], Faculty.prototype, "departments", void 0);
+Faculty = __decorate([
     sequelize_typescript_1.Table
-], Usersession);
-exports.default = Usersession;
+], Faculty);
+exports.default = Faculty;

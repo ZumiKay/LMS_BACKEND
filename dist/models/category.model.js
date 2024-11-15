@@ -15,18 +15,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const sequelize_typescript_1 = require("sequelize-typescript");
 const book_model_1 = __importDefault(require("./book.model"));
 const category_item_model_1 = __importDefault(require("./category_item.model"));
+const sequelize_1 = require("sequelize");
 let Category = class Category extends sequelize_typescript_1.Model {
 };
 __decorate([
     (0, sequelize_typescript_1.BelongsToMany)(() => book_model_1.default, () => category_item_model_1.default),
-    __metadata("design:type", Object)
+    __metadata("design:type", Array)
 ], Category.prototype, "items", void 0);
 __decorate([
     sequelize_typescript_1.Column,
     __metadata("design:type", String)
 ], Category.prototype, "name", void 0);
 __decorate([
-    sequelize_typescript_1.Column,
+    (0, sequelize_typescript_1.Column)({ type: sequelize_1.DataTypes.STRING, allowNull: true }),
     __metadata("design:type", Object)
 ], Category.prototype, "description", void 0);
 Category = __decorate([

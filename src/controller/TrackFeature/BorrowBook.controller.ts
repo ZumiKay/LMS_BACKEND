@@ -12,7 +12,6 @@ import { Op } from "sequelize";
 import User from "../../models/user.model";
 import Bucket, { BucketStatus } from "../../models/bucket.model";
 import BookBucket from "../../models/bookbucket.model";
-import Category from "../../models/category.model";
 
 export default async function BorrowBookHandler(
   req: CustomReqType,

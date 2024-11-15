@@ -58,18 +58,33 @@ export const VerifyToken = async (
   res: Response,
   next: NextFunction
 ) => {
-  const token = req.cookies[process.env.ACCESSTOKEN_COOKIENAME as string];
+  try {
+    const token = req.cookies[process.env.ACCESSTOKEN_COOKIENAME as string];
 
-  if (!token) {
-    return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    if (!token) {
+      return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    }
+
+    const payload = JWT.verify(token, process.env.JWT_SECRET as string) as any;
+
+    if (!payload) {
+      return res.status(403).json({ status: ErrorCode("No Access") });
+    }
+
+    req.user = payload;
+    next();
+  } catch (error) {
+    console.log("Verify Token Error:", error);
+
+    if (error instanceof JWT.TokenExpiredError) {
+      return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    }
+    if (error instanceof JWT.JsonWebTokenError) {
+      return res.status(403).json({ status: ErrorCode("No Access") });
+    }
+
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
-
-  const payload = await JWT.verify(token, process.env.JWT_SECRET as string);
-  req.user = payload as any;
-
-  if (!payload) return res.status(403).json({ status: ErrorCode("No Access") });
-
-  return next();
 };
 
 async function CheckRole({
@@ -78,14 +93,14 @@ async function CheckRole({
   res,
   next,
 }: {
-  role: Role;
+  role: Role[];
   req: CustomReqType;
   res: Response;
   next: NextFunction;
 }) {
   if (!req.user)
     return res.status(401).json({ status: ErrorCode("Unauthenticated") });
-  if (role === req.user.role) return next();
+  if (role.includes(req.user.role)) return next();
 
   return res.status(403).json({ status: ErrorCode("No Access") });
 }
@@ -93,10 +108,10 @@ export const IsAdmin = async (
   req: CustomReqType,
   res: Response,
   next: NextFunction
-) => CheckRole({ role: ROLE.LIBRARIAN, req, res, next });
+) => CheckRole({ role: [ROLE.LIBRARIAN], req, res, next });
 
 export const IsHD = async (
   req: CustomReqType,
   res: Response,
   next: NextFunction
-) => CheckRole({ role: ROLE.HEADDEPARTMENT || ROLE.LIBRARIAN, req, res, next });
+) => CheckRole({ role: [ROLE.LIBRARIAN, ROLE.HEADDEPARTMENT], req, res, next });

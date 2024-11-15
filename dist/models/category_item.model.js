@@ -27,7 +27,7 @@ __decorate([
     (0, sequelize_typescript_1.ForeignKey)(() => book_model_1.default),
     (0, sequelize_typescript_1.Column)({
         type: sequelize_1.DataTypes.INTEGER,
-        allowNull: true, // Allow `null` for `bookId`
+        allowNull: true,
     }),
     __metadata("design:type", Object)
 ], Categoryitem.prototype, "bookId", void 0);

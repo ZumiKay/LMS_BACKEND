@@ -16,7 +16,7 @@ import {
 } from "../controller/Authentication/Account.controller";
 import SummaryStudentUsage from "../controller/TrackFeature/SummaryStudentInfo.controller";
 import { GetDepartment } from "../controller/Admin/Department.controller";
-import { ExportReport } from "../controller/Admin/Report.controller";
+import ReportExporter from "../controller/Admin/Report.controller";
 
 const Router = router();
 
@@ -48,10 +48,13 @@ Router.post("/uploadimg", UploadCover as any);
 //Get SummaryInfo
 Router.post("/getsummaryusage", VerifyToken as any, SummaryStudentUsage as any);
 Router.get("/getdepartment", VerifyToken as any, GetDepartment as any);
+
+const exportreport = new ReportExporter();
 Router.post(
   "/generatereport",
   VerifyToken as any,
   IsHD as any,
-  ExportReport as any
+  exportreport.exportReport as any
 );
+
 export default Router;

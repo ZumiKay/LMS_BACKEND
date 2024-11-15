@@ -9,16 +9,26 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const InitalStartSever = () => __awaiter(void 0, void 0, void 0, function* () {
+exports.DeleteFromStorage = exports.UploadToStorage = void 0;
+const blob_1 = require("@vercel/blob");
+const UploadToStorage = (file, name) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // await sequelize.sync();
-        // await SeedAdmin();
-        // await SeedPopularBook();
-        // const seeded = await SeedStudentEntry();
-        // if (seeded) console.log("Seeded Entry");
+        const blob = yield (0, blob_1.put)(name, file, { access: "public" });
+        return blob;
     }
     catch (error) {
-        console.error("Unable to connect to the database:", error);
+        console.log("Upload to storage", error);
+        return null;
     }
 });
-exports.default = InitalStartSever;
+exports.UploadToStorage = UploadToStorage;
+const DeleteFromStorage = (fileurl) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield (0, blob_1.del)(fileurl);
+    }
+    catch (error) {
+        console.log("Delete from storage", error);
+        throw error;
+    }
+});
+exports.DeleteFromStorage = DeleteFromStorage;

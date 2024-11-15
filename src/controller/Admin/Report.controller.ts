@@ -11,62 +11,77 @@ import {
 } from "../../Utilities/Helper";
 import { generateExcel } from "../../config/excel";
 import Department from "../../models/department.model";
+import { ROLE } from "../../Types/AuthenticationType";
+import Faculty from "../../models/faculty.model";
 
-export async function ExportReport(req: Request, res: Response) {
-  try {
-    const {
-      name,
-      department,
-      information,
-      informationtype,
-      startdate,
-      enddate,
-    } = req.body as ExportReportType;
+class ReportExporter {
+  exportReport = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const {
+        name,
+        department,
+        information,
+        informationtype,
+        startdate,
+        enddate,
+      } = req.body as ExportReportType;
 
-    const result =
-      department !== "all"
-        ? await User.findAll({
-            where: {
-              [Op.and]: [{ role: "STUDENT" }, { department }],
-            },
-            attributes: {
-              exclude: ["password"],
-            },
-            include: [
-              {
-                model: LibraryEntry,
-                as: "entries",
-              },
-              {
-                model: Department,
-                as: "deparment",
-              },
-            ],
-          })
-        : await User.findAll({
-            where: { role: "STUDENT" },
-            attributes: {
-              exclude: ["password"],
-            },
-            include: [
-              {
-                model: LibraryEntry,
-                as: "entries",
-              },
-              {
-                model: Department,
-                as: "deparment",
-              },
-              { model: BorrowBook, as: "borrowbooks" },
-            ],
-          });
+      const result = await this.fetchUsers(department);
 
-    if (result.length === 0)
-      return res
-        .status(404)
-        .json({ message: "No Student Found", status: ErrorCode("Not Found") });
+      if (result.length === 0) {
+        return res.status(404).json({
+          message: "No Student Found",
+          status: ErrorCode("Not Found"),
+        });
+      }
 
-    const data: ExcelDataType[] = result.map((student) => {
+      const data = this.prepareData(
+        result,
+        information,
+        new Date(startdate),
+        new Date(enddate)
+      );
+      const buffer = await this.generateExcelFile(
+        data,
+        information,
+        informationtype,
+        name
+      );
+
+      return this.sendExcelResponse(res, buffer, name);
+    } catch (error) {
+      console.log("Generate Report Excel", error);
+      return res.status(500).json({ status: ErrorCode("Error Server 500") });
+    }
+  };
+
+  private fetchUsers = async (department: string) => {
+    return User.findAll({
+      where: {
+        role: ROLE.STUDENT,
+      },
+      attributes: { exclude: ["password"] },
+
+      include: [
+        { model: LibraryEntry, as: "entries" },
+        {
+          model: Department,
+          where: { department },
+          required: true,
+          include: [Faculty],
+        },
+        { model: BorrowBook },
+      ],
+    });
+  };
+
+  private prepareData = (
+    users: User[],
+    information: string,
+    startdate: Date,
+    enddate: Date
+  ): ExcelDataType[] => {
+    return users.map((student) => {
       const {
         studentID,
         firstname,
@@ -78,15 +93,15 @@ export async function ExportReport(req: Request, res: Response) {
 
       const library_entry = filterDataByTimeRange(
         student.entries ?? [],
-        startdate,
-        enddate
+        startdate.toISOString(),
+        enddate.toISOString()
       );
       const borrowedbook =
         information !== "entry"
           ? filterDataBorrowByTimeRange(
               student.borrowbooks?.map((i) => i.createdAt) ?? [],
-              startdate,
-              enddate
+              startdate.toISOString(),
+              enddate.toISOString()
             )
           : [];
 
@@ -101,16 +116,30 @@ export async function ExportReport(req: Request, res: Response) {
         borrowedbook,
       };
     });
+  };
+
+  private generateExcelFile = async (
+    data: ExcelDataType[],
+    information: string,
+    informationtype: string,
+    name: string
+  ): Promise<Buffer> => {
     const workbook = generateExcel(data, information, informationtype);
-    const buffer = await workbook.xlsx.writeBuffer();
+    return workbook.xlsx.writeBuffer() as Promise<Buffer>;
+  };
+
+  private sendExcelResponse = (
+    res: Response,
+    buffer: Buffer,
+    name: string
+  ): Response => {
     res.setHeader("Content-Disposition", `attachment; filename="${name}.xlsx"`);
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-    res.send(buffer);
-  } catch (error) {
-    console.log("Generate Report Excel", error);
-    return res.status(500).json({ status: ErrorCode("Error Server 500") });
-  }
+    return res.send(buffer);
+  };
 }
+
+export default ReportExporter;
