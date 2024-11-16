@@ -230,7 +230,16 @@ export async function ForgotPassword(req: Request, res: Response) {
       return res.status(400).json({ status: ErrorCode("Bad Request") });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [
+          { studentID: email },
+          {
+            email,
+          },
+        ],
+      },
+    });
     if (!user) {
       return res.status(404).json({ status: ErrorCode("Not Found") });
     }
@@ -248,8 +257,10 @@ export async function ForgotPassword(req: Request, res: Response) {
           if (!existingCode) isCodeUnique = true;
         } while (!isCodeUnique);
 
+        await User.update({ code: generatedCode }, { where: { id: user?.id } });
+
         await SendEmail(
-          email,
+          email.includes("@") ? email : user?.email ?? "",
           "Reset Password",
           html.replace(":code:", generatedCode)
         );
@@ -273,7 +284,7 @@ export async function ForgotPassword(req: Request, res: Response) {
         const hashedPassword = HashPassword(password);
         await User.update(
           { password: hashedPassword },
-          { where: { id: user.id } }
+          { where: { id: user?.id } }
         );
         break;
 

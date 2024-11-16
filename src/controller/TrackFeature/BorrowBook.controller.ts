@@ -20,10 +20,8 @@ export default async function BorrowBookHandler(
   const transaction = await sequelize.transaction();
   try {
     const data = req.body as { bucketId: number };
-
     if (!data.bucketId)
       return res.status(400).json({ status: ErrorCode("Bad Request") });
-
     const bucket = await Bucket.findByPk(data.bucketId, {
       transaction,
       include: [Book],

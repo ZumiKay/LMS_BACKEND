@@ -196,12 +196,22 @@ function DeleteMultipleUser(req, res) {
 }
 function ForgotPassword(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         try {
             const { type, email, code, html, password } = req.body;
             if (!email) {
                 return res.status(400).json({ status: (0, ErrorCode_1.default)("Bad Request") });
             }
-            const user = yield user_model_1.default.findOne({ where: { email } });
+            const user = yield user_model_1.default.findOne({
+                where: {
+                    [sequelize_1.Op.or]: [
+                        { studentID: email },
+                        {
+                            email,
+                        },
+                    ],
+                },
+            });
             if (!user) {
                 return res.status(404).json({ status: (0, ErrorCode_1.default)("Not Found") });
             }
@@ -217,7 +227,8 @@ function ForgotPassword(req, res) {
                         if (!existingCode)
                             isCodeUnique = true;
                     } while (!isCodeUnique);
-                    yield (0, email_1.SendEmail)(email, "Reset Password", html.replace(":code:", generatedCode));
+                    yield user_model_1.default.update({ code: generatedCode }, { where: { id: user === null || user === void 0 ? void 0 : user.id } });
+                    yield (0, email_1.SendEmail)(email.includes("@") ? email : (_a = user === null || user === void 0 ? void 0 : user.email) !== null && _a !== void 0 ? _a : "", "Reset Password", html.replace(":code:", generatedCode));
                     break;
                 case "Verify":
                     const validCode = yield user_model_1.default.findOne({ where: { code } });
@@ -232,7 +243,7 @@ function ForgotPassword(req, res) {
                         return res.status(400).json({ status: (0, ErrorCode_1.default)("Bad Request") });
                     }
                     const hashedPassword = (0, Security_1.HashPassword)(password);
-                    yield user_model_1.default.update({ password: hashedPassword }, { where: { id: user.id } });
+                    yield user_model_1.default.update({ password: hashedPassword }, { where: { id: user === null || user === void 0 ? void 0 : user.id } });
                     break;
                 default:
                     return res.status(403).json({ status: (0, ErrorCode_1.default)("No Access") });
