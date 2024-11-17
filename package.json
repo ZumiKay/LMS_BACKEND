@@ -8,8 +8,14 @@
     "build": "tsc",
     "serve": "nodemon dist/index.js",
     "dev": "nodemon --watch src --exec ts-node src/index.ts"
+    
   },
   "keywords": [],
+  "pre-commit": [
+      "ts.check",
+      "build",
+      "add-build"
+  ],
   "author": "",
   "license": "ISC",
   "description": "",
