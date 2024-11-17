@@ -241,7 +241,7 @@ export async function SeedAdmin() {
       role: ROLE.LIBRARIAN,
       studentID: "00000001",
       email: "workzumi@gmail.com",
-      password: HashPassword("KKzumi@001"),
+      password: HashPassword("Kkzumi@001"),
     };
     await User.create({ ...data });
     console.log("Seeded");

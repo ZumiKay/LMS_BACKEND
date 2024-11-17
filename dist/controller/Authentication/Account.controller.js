@@ -198,7 +198,7 @@ function SeedAdmin() {
                 role: AuthenticationType_1.ROLE.LIBRARIAN,
                 studentID: "00000001",
                 email: "workzumi@gmail.com",
-                password: (0, Security_1.HashPassword)("KKzumi@001"),
+                password: (0, Security_1.HashPassword)("Kkzumi@001"),
             };
             yield user_model_1.default.create(Object.assign({}, data));
             console.log("Seeded");
