@@ -35,6 +35,7 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
 app.use("/api", Router_1.default);
 app.get("/", (req, res) => {
+    (0, Initial_1.default)();
     res.send("Hello, TypeScript with Express!");
 });
 // A POST route
@@ -57,7 +58,6 @@ app.get("/getbook", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
     res.status(200).send({ get });
 }));
-(0, Initial_1.default)();
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });

@@ -29,6 +29,7 @@ app.use(cookieParser());
 app.use("/api", Router);
 
 app.get("/", (req: Request, res: Response) => {
+  InitalStartSever();
   res.send("Hello, TypeScript with Express!");
 });
 
@@ -52,8 +53,6 @@ app.get("/getbook", async (req: Request, res: Response) => {
 
   res.status(200).send({ get });
 });
-
-InitalStartSever();
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
