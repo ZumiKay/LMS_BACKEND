@@ -20,5 +20,6 @@ declare namespace NodeJS {
     BLOB_READ_WRITE_TOKEN: string;
     PARAGONIU_URL: string;
     PORT?: string;
+    FRONTEND_URL: string;
   }
 }

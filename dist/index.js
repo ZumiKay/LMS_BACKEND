@@ -24,7 +24,7 @@ const Book_controller_1 = require("./controller/Admin/Book.controller");
 const app = (0, express_1.default)();
 const port = process.env.PORT || 4000;
 app.use((0, cors_1.default)({
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND_URL,
     credentials: true,
 }));
 app.use((0, morgan_1.default)("dev"));
@@ -35,7 +35,6 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
 app.use("/api", Router_1.default);
 app.get("/", (req, res) => {
-    (0, Initial_1.default)();
     res.send("Hello, TypeScript with Express!");
 });
 // A POST route
@@ -59,6 +58,7 @@ app.get("/getbook", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     res.status(200).send({ get });
 }));
 app.listen(port, () => {
+    (0, Initial_1.default)();
     console.log(`Server is running on http://localhost:${port}`);
 });
 exports.default = app;

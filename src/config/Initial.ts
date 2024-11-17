@@ -6,14 +6,14 @@ import sequelize from "./database";
 
 const InitalStartSever = async () => {
   try {
-    await sequelize.sync();
-    await SeedAdmin();
-    await Promise.all(
-      ["Action", "Romance", "Astrology", "Health", "Mystery"].map((cate) =>
-        getgooglebook(cate)
-      )
-    );
-    await SeedPopularBook();
+    // await sequelize.sync();
+    // await SeedAdmin();
+    // await Promise.all(
+    //   ["Action", "Romance", "Astrology", "Health", "Mystery"].map((cate) =>
+    //     getgooglebook(cate)
+    //   )
+    // );
+    // await SeedPopularBook();
 
     console.log("DB Connection Is Connected");
   } catch (error) {

@@ -2,7 +2,6 @@ import express, { Request, Response } from "express";
 import InitalStartSever from "./config/Initial";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-
 import Router from "./Router";
 import { configDotenv } from "dotenv";
 import cors from "cors";
@@ -15,7 +14,7 @@ const port = process.env.PORT || 4000;
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   })
 );
@@ -29,7 +28,6 @@ app.use(cookieParser());
 app.use("/api", Router);
 
 app.get("/", (req: Request, res: Response) => {
-  InitalStartSever();
   res.send("Hello, TypeScript with Express!");
 });
 
@@ -55,6 +53,7 @@ app.get("/getbook", async (req: Request, res: Response) => {
 });
 
 app.listen(port, () => {
+  InitalStartSever();
   console.log(`Server is running on http://localhost:${port}`);
 });
 
