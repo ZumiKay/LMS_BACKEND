@@ -8,13 +8,12 @@
     "build": "tsc",
     "serve": "nodemon dist/index.js",
     "dev": "nodemon --watch src --exec ts-node src/index.ts"
-    
   },
   "keywords": [],
   "pre-commit": [
-      "ts.check",
-      "build",
-      "add-build"
+    "ts.check",
+    "build",
+    "add-build"
   ],
   "author": "",
   "license": "ISC",
@@ -52,6 +51,7 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.7.4",
     "@types/nodemailer": "^6.4.16",
+    "@types/pg": "^8.11.10",
     "@types/qrcode": "^1.5.5",
     "@types/sequelize": "^4.28.20",
     "@types/supertest": "^6.0.2",

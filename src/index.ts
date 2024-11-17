@@ -53,8 +53,9 @@ app.get("/getbook", async (req: Request, res: Response) => {
   res.status(200).send({ get });
 });
 
+InitalStartSever();
+
 app.listen(port, () => {
-  InitalStartSever();
   console.log(`Server is running on http://localhost:${port}`);
 });
 

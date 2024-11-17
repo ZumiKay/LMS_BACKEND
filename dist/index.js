@@ -57,8 +57,8 @@ app.get("/getbook", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
     res.status(200).send({ get });
 }));
+(0, Initial_1.default)();
 app.listen(port, () => {
-    (0, Initial_1.default)();
     console.log(`Server is running on http://localhost:${port}`);
 });
 exports.default = app;

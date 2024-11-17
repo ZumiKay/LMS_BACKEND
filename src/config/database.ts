@@ -1,4 +1,5 @@
 import { Sequelize } from "sequelize-typescript";
+
 import "../config/dotenv";
 import Category from "../models/category.model";
 import Categoryitem from "../models/category_item.model";
@@ -12,6 +13,7 @@ import LibraryEntry from "../models/libraryentry.model";
 import Bucket from "../models/bucket.model";
 import BookBucket from "../models/bookbucket.model";
 import Faculty from "../models/faculty.model";
+import pg from "pg";
 
 const sequelize = new Sequelize({
   dialect: "postgres",
@@ -19,6 +21,7 @@ const sequelize = new Sequelize({
   database: process.env.DB_NAME,
   username: process.env.DB_USER,
   password: process.env.DB_PASS,
+  dialectModule: pg,
 });
 
 sequelize.addModels([

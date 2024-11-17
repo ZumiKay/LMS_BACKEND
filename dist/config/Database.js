@@ -16,12 +16,14 @@ const libraryentry_model_1 = __importDefault(require("../models/libraryentry.mod
 const bucket_model_1 = __importDefault(require("../models/bucket.model"));
 const bookbucket_model_1 = __importDefault(require("../models/bookbucket.model"));
 const faculty_model_1 = __importDefault(require("../models/faculty.model"));
+const pg_1 = __importDefault(require("pg"));
 const sequelize = new sequelize_typescript_1.Sequelize({
     dialect: "postgres",
     host: process.env.DB_HOST,
     database: process.env.DB_NAME,
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
+    dialectModule: pg_1.default,
 });
 sequelize.addModels([
     category_model_1.default,
