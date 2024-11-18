@@ -165,8 +165,16 @@ export async function SignOut(req: CustomReqType, res: Response) {
       },
     });
 
-    res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME as string);
-    res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME as string);
+    res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME as string, {
+      httpOnly: true,
+      sameSite: "none",
+      secure: process.env.NODE_ENV === "production",
+    });
+    res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME as string, {
+      httpOnly: true,
+      sameSite: "none",
+      secure: process.env.NODE_ENV === "production",
+    });
 
     return res.status(200).json({ message: "Signed Out" });
   } catch (error) {
