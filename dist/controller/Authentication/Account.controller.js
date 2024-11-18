@@ -97,7 +97,8 @@ function Login(req, res) {
             });
             const cookieOptions = {
                 httpOnly: true,
-                sameSite: "lax",
+                sameSite: "none",
+                secure: process.env.NODE_ENV === "production",
             };
             res.cookie(process.env.ACCESSTOKEN_COOKIENAME, AccessToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: accessTokenExpire * 1000 }));
             res.cookie(process.env.REFRESHTOKEN_COOKIENAME, RefreshToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: refreshTokenExpire * 1000 }));

@@ -120,7 +120,8 @@ export async function Login(req: Request, res: Response) {
 
     const cookieOptions = {
       httpOnly: true,
-      sameSite: "lax" as const,
+      sameSite: "none" as const,
+      secure: process.env.NODE_ENV === "production",
     };
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, AccessToken, {
