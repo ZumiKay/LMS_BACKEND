@@ -182,7 +182,8 @@ function RefreshToken(req, res) {
             }, process.env.JWT_SECRET, accessTokenExpire);
             res.cookie(process.env.ACCESSTOKEN_COOKIENAME, newToken, {
                 httpOnly: true,
-                sameSite: "lax",
+                sameSite: "none",
+                secure: process.env.NODE_ENV === "production",
                 maxAge: accessTokenExpire * 1000,
             });
             return res.status(200).json({ message: "Refreshed Token" });

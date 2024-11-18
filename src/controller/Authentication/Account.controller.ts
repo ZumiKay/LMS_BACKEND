@@ -224,7 +224,8 @@ export async function RefreshToken(req: CustomReqType, res: Response) {
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, newToken, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "none",
+      secure: process.env.NODE_ENV === "production",
       maxAge: accessTokenExpire * 1000,
     });
 
