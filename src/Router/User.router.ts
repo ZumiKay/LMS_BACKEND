@@ -23,7 +23,7 @@ UserRoute.post("/login", Login as any);
 UserRoute.get("/getinfo", VerifyToken as any, GetUserInfo as any);
 UserRoute.put("/edituser", VerifyToken as any, EditUserInfo as any);
 UserRoute.post("/forgotpassword", ForgotPassword as any);
-UserRoute.get("/logout", VerifyToken as any, SignOut as any);
+UserRoute.post("/logout", VerifyToken as any, SignOut as any);
 UserRoute.post("/checkout", VerifyToken as any, BorrowBookHandler as any);
 
 //BorrowBook

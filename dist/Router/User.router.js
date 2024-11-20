@@ -15,7 +15,7 @@ UserRoute.post("/login", Account_controller_1.Login);
 UserRoute.get("/getinfo", UserValidate_1.VerifyToken, User_controller_1.GetUserInfo);
 UserRoute.put("/edituser", UserValidate_1.VerifyToken, User_controller_1.EditUserInfo);
 UserRoute.post("/forgotpassword", User_controller_1.ForgotPassword);
-UserRoute.get("/logout", UserValidate_1.VerifyToken, Account_controller_1.SignOut);
+UserRoute.post("/logout", UserValidate_1.VerifyToken, Account_controller_1.SignOut);
 UserRoute.post("/checkout", UserValidate_1.VerifyToken, BorrowBook_controller_1.default);
 //BorrowBook
 UserRoute.get("/checkcart", UserValidate_1.VerifyToken, bookcart_controller_1.CountBucketItems);
