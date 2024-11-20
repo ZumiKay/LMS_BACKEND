@@ -3,7 +3,6 @@ import {
   CustomReqType,
   LoginType,
   ROLE,
-  Role,
   Usertype,
 } from "../../Types/AuthenticationType";
 import { generateToken, HashPassword } from "../../Utilities/Security";
