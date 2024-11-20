@@ -132,15 +132,17 @@ function SignOut(req, res) {
                     [sequelize_1.Op.and]: [{ userId: user.id, session_id: refershtoken }],
                 },
             });
-            res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME, {
+            res.cookie(process.env.ACCESSTOKEN_COOKIENAME, {
                 httpOnly: true,
                 sameSite: "none",
                 secure: process.env.NODE_ENV === "production",
+                expires: new Date(0),
             });
-            res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME, {
+            res.cookie(process.env.REFRESHTOKEN_COOKIENAME, {
                 httpOnly: true,
                 sameSite: "none",
                 secure: process.env.NODE_ENV === "production",
+                expires: new Date(0),
             });
             return res.status(200).json({ message: "Signed Out" });
         }
