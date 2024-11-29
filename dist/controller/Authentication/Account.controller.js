@@ -87,8 +87,8 @@ function Login(req, res) {
             };
             const accessTokenExpire = 10 * 60; // 10 minutes
             const refreshTokenExpire = 2 * 60 * 60; // 2 hours
-            const AccessToken = (0, Security_1.generateToken)(TokenPayload, process.env.JWT_SECRET, accessTokenExpire);
-            const RefreshToken = (0, Security_1.generateToken)(TokenPayload, process.env.REFRESH_JWT_SECRET, refreshTokenExpire);
+            const AccessToken = (0, Security_1.generateToken)(TokenPayload, process.env.JWT_SECRET, accessTokenExpire * 1000);
+            const RefreshToken = (0, Security_1.generateToken)(TokenPayload, process.env.REFRESH_JWT_SECRET, refreshTokenExpire * 1000);
             // Save login session
             yield usersession_model_1.default.create({
                 session_id: RefreshToken,
@@ -97,11 +97,11 @@ function Login(req, res) {
             });
             const cookieOptions = {
                 httpOnly: true,
-                sameSite: "none",
+                sameSite: "lax",
                 secure: process.env.NODE_ENV === "production",
             };
-            res.cookie(process.env.ACCESSTOKEN_COOKIENAME, AccessToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: accessTokenExpire * 1000 }));
-            res.cookie(process.env.REFRESHTOKEN_COOKIENAME, RefreshToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: refreshTokenExpire * 1000 }));
+            res.cookie(process.env.ACCESSTOKEN_COOKIENAME, AccessToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: 10 * 60 * 1000 }));
+            res.cookie(process.env.REFRESHTOKEN_COOKIENAME, RefreshToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: 2 * 60 * 60 * 1000 }));
             return res.status(200).json({ message: "Logged In" });
         }
         catch (error) {
@@ -134,14 +134,14 @@ function SignOut(req, res) {
             });
             res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME, {
                 httpOnly: true,
-                sameSite: "none",
+                sameSite: "lax",
                 secure: process.env.NODE_ENV === "production",
                 expires: new Date(0),
                 path: "/",
             });
             res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME, {
                 httpOnly: true,
-                sameSite: "none",
+                sameSite: "lax",
                 secure: process.env.NODE_ENV === "production",
                 expires: new Date(0),
                 path: "/",
@@ -186,7 +186,7 @@ function RefreshToken(req, res) {
             }, process.env.JWT_SECRET, accessTokenExpire);
             res.cookie(process.env.ACCESSTOKEN_COOKIENAME, newToken, {
                 httpOnly: true,
-                sameSite: "none",
+                sameSite: "lax",
                 secure: process.env.NODE_ENV === "production",
                 maxAge: accessTokenExpire * 1000,
             });

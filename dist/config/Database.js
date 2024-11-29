@@ -24,12 +24,6 @@ const sequelize = new sequelize_typescript_1.Sequelize({
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     dialectModule: pg_1.default,
-    dialectOptions: {
-        ssl: {
-            require: true,
-            rejectUnauthorized: false,
-        },
-    },
 });
 sequelize.addModels([
     category_model_1.default,

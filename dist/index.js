@@ -19,7 +19,6 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const Router_1 = __importDefault(require("./Router"));
 const dotenv_1 = require("dotenv");
 const cors_1 = __importDefault(require("cors"));
-const Book_controller_1 = require("./controller/Admin/Book.controller");
 (0, dotenv_1.configDotenv)();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 4000;
@@ -48,14 +47,13 @@ app.post("/api/data", (req, res) => {
     }
 });
 app.get("/getbook", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const get = yield (0, Book_controller_1.getgooglebook)("Science fiction");
-    if (get.success) {
-        console.log("Got Google Book");
-    }
-    else {
-        console.log("Error");
-    }
-    res.status(200).send({ get });
+    res.cookie("Testcookie", "testvalue", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: true,
+        maxAge: 60 * 60 * 1000,
+    });
+    res.status(200).send("Cookie Set");
 }));
 app.listen(port, () => {
     (0, Initial_1.default)();

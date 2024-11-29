@@ -42,14 +42,13 @@ app.post("/api/data", (req: Request, res: Response) => {
 });
 
 app.get("/getbook", async (req: Request, res: Response) => {
-  const get = await getgooglebook("Science fiction");
-  if (get.success) {
-    console.log("Got Google Book");
-  } else {
-    console.log("Error");
-  }
-
-  res.status(200).send({ get });
+  res.cookie("Testcookie", "testvalue", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    maxAge: 60 * 60 * 1000,
+  });
+  res.status(200).send("Cookie Set");
 });
 
 app.listen(port, () => {

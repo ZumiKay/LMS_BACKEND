@@ -102,12 +102,12 @@ export async function Login(req: Request, res: Response) {
     const AccessToken = generateToken(
       TokenPayload,
       process.env.JWT_SECRET as string,
-      accessTokenExpire
+      accessTokenExpire * 1000
     );
     const RefreshToken = generateToken(
       TokenPayload,
       process.env.REFRESH_JWT_SECRET as string,
-      refreshTokenExpire
+      refreshTokenExpire * 1000
     );
 
     // Save login session
@@ -119,17 +119,17 @@ export async function Login(req: Request, res: Response) {
 
     const cookieOptions = {
       httpOnly: true,
-      sameSite: "none" as const,
+      sameSite: "lax" as const,
       secure: process.env.NODE_ENV === "production",
     };
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, AccessToken, {
       ...cookieOptions,
-      maxAge: accessTokenExpire * 1000,
+      maxAge: 10 * 60 * 1000,
     });
     res.cookie(process.env.REFRESHTOKEN_COOKIENAME as string, RefreshToken, {
       ...cookieOptions,
-      maxAge: refreshTokenExpire * 1000,
+      maxAge: 2 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({ message: "Logged In" });
@@ -166,14 +166,14 @@ export async function SignOut(req: CustomReqType, res: Response) {
 
     res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME as string, {
       httpOnly: true,
-      sameSite: "none",
+      sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       expires: new Date(0),
       path: "/",
     });
     res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME as string, {
       httpOnly: true,
-      sameSite: "none",
+      sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       expires: new Date(0),
       path: "/",
@@ -227,7 +227,7 @@ export async function RefreshToken(req: CustomReqType, res: Response) {
 
     res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, newToken, {
       httpOnly: true,
-      sameSite: "none",
+      sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       maxAge: accessTokenExpire * 1000,
     });

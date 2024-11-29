@@ -6,7 +6,7 @@ import sequelize from "./database";
 
 const InitalStartSever = async () => {
   try {
-    await sequelize.sync();
+    // await sequelize.sync();
     // await SeedAdmin();
     // await Promise.all(
     //   ["Action", "Romance", "Astrology", "Health", "Mystery"].map((cate) =>
