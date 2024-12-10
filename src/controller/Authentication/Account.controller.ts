@@ -38,7 +38,16 @@ export default async function RegisterUser(req: Request, res: Response) {
     const password = GenerateRandomCode(8);
     const hashedpass = HashPassword(password);
 
-    const isUser = await User.findOne({ where: { email: email } });
+    const isUser = await User.findOne({
+      where: {
+        [Op.or]: [
+          {
+            email: email,
+          },
+          { studentID },
+        ],
+      },
+    });
 
     if (isUser) {
       return res.status(400).json({ message: "User Exist" });
@@ -117,22 +126,13 @@ export async function Login(req: Request, res: Response) {
       expiredAt: getDateWithOffset(refreshTokenExpire),
     });
 
-    const cookieOptions = {
-      httpOnly: true,
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-    };
-
-    res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, AccessToken, {
-      ...cookieOptions,
-      maxAge: 10 * 60 * 1000,
+    return res.status(200).json({
+      message: "Logged In",
+      data: {
+        AccessToken,
+        RefreshToken,
+      },
     });
-    res.cookie(process.env.REFRESHTOKEN_COOKIENAME as string, RefreshToken, {
-      ...cookieOptions,
-      maxAge: 2 * 60 * 60 * 1000,
-    });
-
-    return res.status(200).json({ message: "Logged In" });
   } catch (error) {
     console.error("Login User Error:", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
@@ -141,9 +141,8 @@ export async function Login(req: Request, res: Response) {
 
 export async function SignOut(req: CustomReqType, res: Response) {
   try {
-    const refershtoken =
-      req.cookies[process.env.REFRESHTOKEN_COOKIENAME as string];
-    if (!refershtoken || !req.user) {
+    const { token } = req.body;
+    if (!token || !req.user) {
       return res.status(400).json({
         message: "Invalid Parameter",
         status: ErrorCode("Bad Request"),
@@ -160,23 +159,8 @@ export async function SignOut(req: CustomReqType, res: Response) {
 
     await Usersession.destroy({
       where: {
-        [Op.and]: [{ userId: user.id, session_id: refershtoken }],
+        [Op.and]: [{ userId: user.id, session_id: token }],
       },
-    });
-
-    res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME as string, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      expires: new Date(0),
-      path: "/",
-    });
-    res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME as string, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      expires: new Date(0),
-      path: "/",
     });
 
     return res.status(200).json({ message: "Signed Out" });
@@ -190,7 +174,7 @@ export async function SignOut(req: CustomReqType, res: Response) {
 
 export async function RefreshToken(req: CustomReqType, res: Response) {
   try {
-    const token = req.cookies[process.env.REFRESHTOKEN_COOKIENAME as string];
+    const { token } = req.body;
 
     if (!token) {
       return res.status(401).json({ status: ErrorCode("Unauthenticated") });
@@ -215,24 +199,41 @@ export async function RefreshToken(req: CustomReqType, res: Response) {
     }
     const accessTokenExpire = 10 * 60; //10 minute
 
-    const newToken = generateToken(
-      {
-        id: isValid.userId,
-        studentID: isValid.user.studentID,
-        role: isValid.user.role,
-      },
+    const refreshTokenExpire = 2 * 60 * 60; // 2 hours
+
+    const tokenpayload = {
+      id: isValid.userId,
+      studentID: isValid.user.studentID,
+      role: isValid.user.role,
+    };
+
+    const newAccessToken = generateToken(
+      tokenpayload,
       process.env.JWT_SECRET as string,
       accessTokenExpire
     );
 
-    res.cookie(process.env.ACCESSTOKEN_COOKIENAME as string, newToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: accessTokenExpire * 1000,
-    });
+    const newRefreshToken = generateToken(
+      tokenpayload,
+      process.env.REFRESH_JWT_SECRET as string,
+      refreshTokenExpire
+    );
 
-    return res.status(200).json({ message: "Refreshed Token" });
+    await Usersession.update(
+      {
+        session_id: newRefreshToken,
+        expiredAt: new Date(Date.now() + refreshTokenExpire * 1000),
+      },
+      { where: { id: isValid.id } }
+    );
+
+    return res.status(200).json({
+      message: "Refreshed Token",
+      data: {
+        AccessToken: newAccessToken,
+        RefreshToken: newRefreshToken,
+      },
+    });
   } catch (error) {
     console.log("Refresh Token", error);
     return res.status(500).json({ status: ErrorCode("Error Server 500") });

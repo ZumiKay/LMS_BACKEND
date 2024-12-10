@@ -59,11 +59,16 @@ export const VerifyToken = async (
   next: NextFunction
 ) => {
   try {
-    const token = req.cookies[process.env.ACCESSTOKEN_COOKIENAME as string];
+    const authHeader = req.headers.authorization;
 
-    if (!token) {
-      return res.status(401).json({ status: ErrorCode("Unauthenticated") });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        status: ErrorCode("Unauthenticated"),
+      });
     }
+
+    const token = authHeader.split(" ")[1];
 
     const payload = JWT.verify(token, process.env.JWT_SECRET as string) as any;
 

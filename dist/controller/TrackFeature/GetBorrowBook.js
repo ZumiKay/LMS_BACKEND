@@ -53,6 +53,11 @@ function ScanBorrowBook(req, res) {
                     include: [
                         {
                             model: borrowbook_model_1.default,
+                            where: {
+                                status: {
+                                    [sequelize_1.Op.not]: BookType_1.BookStatus.RETURNED,
+                                },
+                            },
                             include: [
                                 {
                                     model: bucket_model_1.default,
@@ -162,6 +167,17 @@ const GetBorrowBook_Librarian = (limit, page, status, search) => __awaiter(void 
                 },
             }
             : {})), { limit, offset: (page - 1) * limit }));
+        const borrowToDeleteIDs = borrow_book
+            .filter((borrow) => new Date().getTime() - new Date(borrow.createdAt).getTime() >
+            24 * 60 * 60 * 1000 && borrow.status === BookType_1.BookStatus.TOPICKUP) // Check if older than 24 hours
+            .map((borrow) => borrow.id);
+        if (borrowToDeleteIDs.length > 0) {
+            const bookid = borrow_book.flatMap((i) => i.bucket.books.map((i) => i.id));
+            if (bookid.length > 0) {
+                yield book_model_1.default.update({ status: BookType_1.BookStatus.AVAILABLE }, { where: { id: { [sequelize_1.Op.in]: bookid } } });
+            }
+            yield borrowbook_model_1.default.update({ status: BookType_1.BookStatus.EXPIRED, qrcode: null }, { where: { id: { [sequelize_1.Op.in]: borrowToDeleteIDs } } });
+        }
         //Pepare For Return Data
         return {
             data: borrow_book.map((borrow) => (Object.assign(Object.assign({}, borrow.dataValues), { createdAt: (0, Helper_1.formatDateToMMDDYYYYHHMMSS)(borrow.dataValues.createdAt) }))),
@@ -174,10 +190,13 @@ const GetBorrowBook_Librarian = (limit, page, status, search) => __awaiter(void 
 });
 exports.GetBorrowBook_Librarian = GetBorrowBook_Librarian;
 const GetBorrowBook_STUDENT = (studentID, id, limit, page, status, search, ty) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const borrow_book_count = yield borrowbook_model_1.default.count({ where: { userId: id } });
+        const borrow_book_count = yield borrowbook_model_1.default.count({
+            where: { userId: id },
+        });
         const borrow_book = yield user_model_1.default.findOne({
-            where: { studentID, id },
+            where: { [sequelize_1.Op.or]: [Object.assign({}, (studentID && { studentID })), { id }] },
             include: [
                 Object.assign(Object.assign(Object.assign({ model: borrowbook_model_1.default }, (status || search
                     ? {
@@ -215,9 +234,28 @@ const GetBorrowBook_STUDENT = (studentID, id, limit, page, status, search, ty) =
                 exclude: ["password", "firstname", "lastname", "email", "studentID"], // Omit user fields
             },
         });
-        if (!borrow_book || !borrow_book.borrowbooks)
+        if (!borrow_book || !borrow_book.borrowbooks) {
             throw new Error("No borrow book found");
+        }
         const paginationBorrowBook = (0, Helper_1.paginateArray)(borrow_book.borrowbooks, page, limit);
+        //Delete TOPICKUP Borrow Exceed 24 hrs
+        const borrowToDeleteIDs = borrow_book.borrowbooks
+            .filter((borrow) => new Date().getTime() - new Date(borrow.createdAt).getTime() >
+            24 * 60 * 60 * 1000 && borrow.status === BookType_1.BookStatus.TOPICKUP) // Check if older than 24 hours
+            .map((borrow) => borrow.id);
+        if (borrowToDeleteIDs.length > 0) {
+            const bookids = (_a = borrow_book.buckets) === null || _a === void 0 ? void 0 : _a.flatMap((i) => i.books.map((j) => j.id));
+            if (bookids && bookids.length > 0) {
+                yield book_model_1.default.update({ status: BookType_1.BookStatus.AVAILABLE }, {
+                    where: {
+                        id: {
+                            [sequelize_1.Op.in]: bookids,
+                        },
+                    },
+                });
+            }
+            yield borrowbook_model_1.default.update({ status: BookType_1.BookStatus.EXPIRED, qrcode: null }, { where: { id: { [sequelize_1.Op.in]: borrowToDeleteIDs } } });
+        }
         return {
             data: paginationBorrowBook.map((borrow) => (Object.assign(Object.assign({}, borrow.dataValues), { createdAt: (0, Helper_1.formatDateToMMDDYYYYHHMMSS)(borrow.dataValues.createdAt) }))),
             totalcount: borrow_book_count,

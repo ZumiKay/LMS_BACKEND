@@ -5,7 +5,8 @@ import cookieParser from "cookie-parser";
 import Router from "./Router";
 import { configDotenv } from "dotenv";
 import cors from "cors";
-import { getgooglebook } from "./controller/Admin/Book.controller";
+import Book from "./models/book.model";
+import { BookStatus } from "./Types/BookType";
 
 configDotenv();
 
@@ -31,25 +32,35 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello, TypeScript with Express!");
 });
 
-// A POST route
-app.post("/api/data", (req: Request, res: Response) => {
-  const { data } = req.body;
-  if (data) {
-    res.status(201).json({ message: "Data received", data });
-  } else {
-    res.status(400).json({ error: "No data provided" });
-  }
-});
+app.get("/resetbook", (async (_req: Request, res: Response) => {
+  await Book.update(
+    { status: BookStatus.AVAILABLE },
+    { where: { status: BookStatus.UNAVAILABLE } }
+  );
 
-app.get("/getbook", async (req: Request, res: Response) => {
-  res.cookie("Testcookie", "testvalue", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: true,
-    maxAge: 60 * 60 * 1000,
-  });
-  res.status(200).send("Cookie Set");
-});
+  return res.send("Reset");
+}) as any);
+
+// A POST route
+// app.post("/api/data", (req: Request, res: Response) => {
+//   const { data } = req.body;
+//   if (data) {
+//     res.status(201).json({ message: "Data received", data });
+//   } else {
+//     res.status(400).json({ error: "No data provided" });
+//   }
+// });
+
+// app.get("/getbook", async (req: Request, res: Response) => {
+//   res.cookie("Testcookie", "testvalue", {
+//     httpOnly: true,
+//     sameSite: "none",
+//     secure: true,
+//     domain: process.env.FRONTEND_URL,
+//     maxAge: 60 * 60 * 1000,
+//   });
+//   res.status(200).send("Cookie Set");
+// });
 
 app.listen(port, () => {
   InitalStartSever();

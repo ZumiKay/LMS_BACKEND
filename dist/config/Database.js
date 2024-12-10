@@ -17,20 +17,14 @@ const bucket_model_1 = __importDefault(require("../models/bucket.model"));
 const bookbucket_model_1 = __importDefault(require("../models/bookbucket.model"));
 const faculty_model_1 = __importDefault(require("../models/faculty.model"));
 const pg_1 = __importDefault(require("pg"));
-const sequelize = new sequelize_typescript_1.Sequelize({
-    dialect: "postgres",
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    dialectModule: pg_1.default,
+const sequelize = new sequelize_typescript_1.Sequelize(Object.assign({ dialect: "postgres", host: process.env.DB_HOST, database: process.env.DB_NAME, username: process.env.DB_USER, password: process.env.DB_PASS, dialectModule: pg_1.default }, (process.env.NODE_ENV === "production" && {
     dialectOptions: {
         ssl: {
             require: true, // Require SSL connection
             rejectUnauthorized: false, // Accept self-signed certificates
         },
     },
-});
+})));
 sequelize.addModels([
     category_model_1.default,
     category_item_model_1.default,

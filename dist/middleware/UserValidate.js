@@ -56,10 +56,14 @@ const PasswordValidate = (password) => {
 exports.PasswordValidate = PasswordValidate;
 const VerifyToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const token = req.cookies[process.env.ACCESSTOKEN_COOKIENAME];
-        if (!token) {
-            return res.status(401).json({ status: (0, ErrorCode_1.default)("Unauthenticated") });
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({
+                message: "Unauthorized",
+                status: (0, ErrorCode_1.default)("Unauthenticated"),
+            });
         }
+        const token = authHeader.split(" ")[1];
         const payload = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         if (!payload) {
             return res.status(403).json({ status: (0, ErrorCode_1.default)("No Access") });

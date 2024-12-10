@@ -218,3 +218,30 @@ export async function DeleteBuckets(req: CustomReqType, res: Response) {
     return res.status(500).json({ status: ErrorCode("Error Server 500") });
   }
 }
+
+export async function VerifyBookByUser(req: CustomReqType, res: Response) {
+  try {
+    const { bookid } = req.body;
+    const bucket = await Bucket.findOne({
+      where: {
+        id: req.user.id,
+      },
+      include: [
+        {
+          model: Book,
+          where: {
+            id: bookid,
+          },
+        },
+      ],
+    });
+
+    if (!bucket || bucket.books.length === 0) return res.status(200);
+
+    if (bucket.books.length !== 0)
+      return res.status(200).json({ incart: true });
+  } catch (error) {
+    console.log("Verify Book Status", error);
+    return res.status(500).json({ status: ErrorCode("Error Server 500") });
+  }
+}

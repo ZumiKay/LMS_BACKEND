@@ -22,12 +22,14 @@ const sequelize = new Sequelize({
   username: process.env.DB_USER,
   password: process.env.DB_PASS,
   dialectModule: pg,
-  dialectOptions: {
-    ssl: {
-      require: true, // Require SSL connection
-      rejectUnauthorized: false, // Accept self-signed certificates
+  ...(process.env.NODE_ENV === "production" && {
+    dialectOptions: {
+      ssl: {
+        require: true, // Require SSL connection
+        rejectUnauthorized: false, // Accept self-signed certificates
+      },
     },
-  },
+  }),
 });
 
 sequelize.addModels([

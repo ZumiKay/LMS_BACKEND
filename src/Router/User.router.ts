@@ -15,7 +15,10 @@ import {
   GetBorrowBook,
   GetBorrowBookDetail,
 } from "../controller/TrackFeature/GetBorrowBook";
-import { CountBucketItems } from "../controller/Cart/bookcart.controller";
+import {
+  CountBucketItems,
+  VerifyBookByUser,
+} from "../controller/Cart/bookcart.controller";
 
 const UserRoute = express.Router();
 
@@ -27,6 +30,8 @@ UserRoute.post("/logout", VerifyToken as any, SignOut as any);
 UserRoute.post("/checkout", VerifyToken as any, BorrowBookHandler as any);
 
 //BorrowBook
+
+UserRoute.post("/verifybook", VerifyToken as any, VerifyBookByUser as any);
 UserRoute.get("/checkcart", VerifyToken as any, CountBucketItems as any);
 UserRoute.get("/getborrowbook", VerifyToken as any, GetBorrowBook as any);
 UserRoute.get(

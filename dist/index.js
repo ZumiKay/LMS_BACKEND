@@ -19,6 +19,8 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const Router_1 = __importDefault(require("./Router"));
 const dotenv_1 = require("dotenv");
 const cors_1 = __importDefault(require("cors"));
+const book_model_1 = __importDefault(require("./models/book.model"));
+const BookType_1 = require("./Types/BookType");
 (0, dotenv_1.configDotenv)();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 4000;
@@ -36,25 +38,29 @@ app.use("/api", Router_1.default);
 app.get("/", (req, res) => {
     res.send("Hello, TypeScript with Express!");
 });
+app.get("/resetbook", ((_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    yield book_model_1.default.update({ status: BookType_1.BookStatus.AVAILABLE }, { where: { status: BookType_1.BookStatus.UNAVAILABLE } });
+    return res.send("Reset");
+})));
 // A POST route
-app.post("/api/data", (req, res) => {
-    const { data } = req.body;
-    if (data) {
-        res.status(201).json({ message: "Data received", data });
-    }
-    else {
-        res.status(400).json({ error: "No data provided" });
-    }
-});
-app.get("/getbook", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    res.cookie("Testcookie", "testvalue", {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: true,
-        maxAge: 60 * 60 * 1000,
-    });
-    res.status(200).send("Cookie Set");
-}));
+// app.post("/api/data", (req: Request, res: Response) => {
+//   const { data } = req.body;
+//   if (data) {
+//     res.status(201).json({ message: "Data received", data });
+//   } else {
+//     res.status(400).json({ error: "No data provided" });
+//   }
+// });
+// app.get("/getbook", async (req: Request, res: Response) => {
+//   res.cookie("Testcookie", "testvalue", {
+//     httpOnly: true,
+//     sameSite: "none",
+//     secure: true,
+//     domain: process.env.FRONTEND_URL,
+//     maxAge: 60 * 60 * 1000,
+//   });
+//   res.status(200).send("Cookie Set");
+// });
 app.listen(port, () => {
     (0, Initial_1.default)();
     console.log(`Server is running on http://localhost:${port}`);

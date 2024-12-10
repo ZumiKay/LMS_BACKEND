@@ -40,6 +40,7 @@ exports.CountBucketItems = CountBucketItems;
 exports.GetBucket = GetBucket;
 exports.EditBucket = EditBucket;
 exports.DeleteBuckets = DeleteBuckets;
+exports.VerifyBookByUser = VerifyBookByUser;
 const ErrorCode_1 = __importDefault(require("../../Utilities/ErrorCode"));
 const BookType_1 = require("../../Types/BookType");
 const bucket_model_1 = __importStar(require("../../models/bucket.model"));
@@ -228,6 +229,34 @@ function DeleteBuckets(req, res) {
         }
         catch (error) {
             console.log("Delete Bucket", error);
+            return res.status(500).json({ status: (0, ErrorCode_1.default)("Error Server 500") });
+        }
+    });
+}
+function VerifyBookByUser(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { bookid } = req.body;
+            const bucket = yield bucket_model_1.default.findOne({
+                where: {
+                    id: req.user.id,
+                },
+                include: [
+                    {
+                        model: book_model_1.default,
+                        where: {
+                            id: bookid,
+                        },
+                    },
+                ],
+            });
+            if (!bucket || bucket.books.length === 0)
+                return res.status(200);
+            if (bucket.books.length !== 0)
+                return res.status(200).json({ incart: true });
+        }
+        catch (error) {
+            console.log("Verify Book Status", error);
             return res.status(500).json({ status: (0, ErrorCode_1.default)("Error Server 500") });
         }
     });

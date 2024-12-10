@@ -37,7 +37,16 @@ function RegisterUser(req, res) {
             }
             const password = (0, Helper_1.GenerateRandomCode)(8);
             const hashedpass = (0, Security_1.HashPassword)(password);
-            const isUser = yield user_model_1.default.findOne({ where: { email: email } });
+            const isUser = yield user_model_1.default.findOne({
+                where: {
+                    [sequelize_1.Op.or]: [
+                        {
+                            email: email,
+                        },
+                        { studentID },
+                    ],
+                },
+            });
             if (isUser) {
                 return res.status(400).json({ message: "User Exist" });
             }
@@ -95,14 +104,13 @@ function Login(req, res) {
                 userId: user.id,
                 expiredAt: (0, Helper_1.getDateWithOffset)(refreshTokenExpire),
             });
-            const cookieOptions = {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-            };
-            res.cookie(process.env.ACCESSTOKEN_COOKIENAME, AccessToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: 10 * 60 * 1000 }));
-            res.cookie(process.env.REFRESHTOKEN_COOKIENAME, RefreshToken, Object.assign(Object.assign({}, cookieOptions), { maxAge: 2 * 60 * 60 * 1000 }));
-            return res.status(200).json({ message: "Logged In" });
+            return res.status(200).json({
+                message: "Logged In",
+                data: {
+                    AccessToken,
+                    RefreshToken,
+                },
+            });
         }
         catch (error) {
             console.error("Login User Error:", error);
@@ -113,8 +121,8 @@ function Login(req, res) {
 function SignOut(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const refershtoken = req.cookies[process.env.REFRESHTOKEN_COOKIENAME];
-            if (!refershtoken || !req.user) {
+            const { token } = req.body;
+            if (!token || !req.user) {
                 return res.status(400).json({
                     message: "Invalid Parameter",
                     status: (0, ErrorCode_1.default)("Bad Request"),
@@ -129,22 +137,8 @@ function SignOut(req, res) {
             }
             yield usersession_model_1.default.destroy({
                 where: {
-                    [sequelize_1.Op.and]: [{ userId: user.id, session_id: refershtoken }],
+                    [sequelize_1.Op.and]: [{ userId: user.id, session_id: token }],
                 },
-            });
-            res.clearCookie(process.env.ACCESSTOKEN_COOKIENAME, {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-                expires: new Date(0),
-                path: "/",
-            });
-            res.clearCookie(process.env.REFRESHTOKEN_COOKIENAME, {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-                expires: new Date(0),
-                path: "/",
             });
             return res.status(200).json({ message: "Signed Out" });
         }
@@ -158,7 +152,7 @@ function SignOut(req, res) {
 function RefreshToken(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const token = req.cookies[process.env.REFRESHTOKEN_COOKIENAME];
+            const { token } = req.body;
             if (!token) {
                 return res.status(401).json({ status: (0, ErrorCode_1.default)("Unauthenticated") });
             }
@@ -179,18 +173,25 @@ function RefreshToken(req, res) {
                 return res.status(401).json({ status: (0, ErrorCode_1.default)("Unauthenticated") });
             }
             const accessTokenExpire = 10 * 60; //10 minute
-            const newToken = (0, Security_1.generateToken)({
+            const refreshTokenExpire = 2 * 60 * 60; // 2 hours
+            const tokenpayload = {
                 id: isValid.userId,
                 studentID: isValid.user.studentID,
                 role: isValid.user.role,
-            }, process.env.JWT_SECRET, accessTokenExpire);
-            res.cookie(process.env.ACCESSTOKEN_COOKIENAME, newToken, {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-                maxAge: accessTokenExpire * 1000,
+            };
+            const newAccessToken = (0, Security_1.generateToken)(tokenpayload, process.env.JWT_SECRET, accessTokenExpire);
+            const newRefreshToken = (0, Security_1.generateToken)(tokenpayload, process.env.REFRESH_JWT_SECRET, refreshTokenExpire);
+            yield usersession_model_1.default.update({
+                session_id: newRefreshToken,
+                expiredAt: new Date(Date.now() + refreshTokenExpire * 1000),
+            }, { where: { id: isValid.id } });
+            return res.status(200).json({
+                message: "Refreshed Token",
+                data: {
+                    AccessToken: newAccessToken,
+                    RefreshToken: newRefreshToken,
+                },
             });
-            return res.status(200).json({ message: "Refreshed Token" });
         }
         catch (error) {
             console.log("Refresh Token", error);

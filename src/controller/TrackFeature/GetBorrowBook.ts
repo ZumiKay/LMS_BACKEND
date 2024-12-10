@@ -43,6 +43,11 @@ export async function ScanBorrowBook(req: Request, res: Response) {
         include: [
           {
             model: BorrowBook,
+            where: {
+              status: {
+                [Op.not]: BookStatus.RETURNED,
+              },
+            },
             include: [
               {
                 model: Bucket,
@@ -199,6 +204,31 @@ export const GetBorrowBook_Librarian = async (
       limit,
       offset: (page - 1) * limit,
     });
+    const borrowToDeleteIDs = borrow_book
+      .filter(
+        (borrow) =>
+          new Date().getTime() - new Date(borrow.createdAt).getTime() >
+            24 * 60 * 60 * 1000 && borrow.status === BookStatus.TOPICKUP
+      ) // Check if older than 24 hours
+      .map((borrow) => borrow.id);
+
+    if (borrowToDeleteIDs.length > 0) {
+      const bookid = borrow_book.flatMap((i) =>
+        i.bucket.books.map((i) => i.id)
+      );
+
+      if (bookid.length > 0) {
+        await Book.update(
+          { status: BookStatus.AVAILABLE },
+          { where: { id: { [Op.in]: bookid } } }
+        );
+      }
+
+      await BorrowBook.update(
+        { status: BookStatus.EXPIRED, qrcode: null },
+        { where: { id: { [Op.in]: borrowToDeleteIDs } } }
+      );
+    }
     //Pepare For Return Data
     return {
       data: borrow_book.map((borrow) => ({
@@ -222,9 +252,11 @@ export const GetBorrowBook_STUDENT = async (
   ty?: "book"
 ) => {
   try {
-    const borrow_book_count = await BorrowBook.count({ where: { userId: id } });
+    const borrow_book_count = await BorrowBook.count({
+      where: { userId: id },
+    });
     const borrow_book = await User.findOne({
-      where: { studentID, id },
+      where: { [Op.or]: [{ ...(studentID && { studentID }) }, { id }] },
       include: [
         {
           model: BorrowBook,
@@ -269,14 +301,47 @@ export const GetBorrowBook_STUDENT = async (
         exclude: ["password", "firstname", "lastname", "email", "studentID"], // Omit user fields
       },
     });
-    if (!borrow_book || !borrow_book.borrowbooks)
+    if (!borrow_book || !borrow_book.borrowbooks) {
       throw new Error("No borrow book found");
+    }
 
     const paginationBorrowBook = paginateArray(
       borrow_book.borrowbooks,
       page,
       limit
     );
+
+    //Delete TOPICKUP Borrow Exceed 24 hrs
+    const borrowToDeleteIDs = borrow_book.borrowbooks
+      .filter(
+        (borrow) =>
+          new Date().getTime() - new Date(borrow.createdAt).getTime() >
+            24 * 60 * 60 * 1000 && borrow.status === BookStatus.TOPICKUP
+      ) // Check if older than 24 hours
+      .map((borrow) => borrow.id);
+
+    if (borrowToDeleteIDs.length > 0) {
+      const bookids = borrow_book.buckets?.flatMap((i) =>
+        i.books.map((j) => j.id)
+      );
+      if (bookids && bookids.length > 0) {
+        await Book.update(
+          { status: BookStatus.AVAILABLE },
+          {
+            where: {
+              id: {
+                [Op.in]: bookids,
+              },
+            },
+          }
+        );
+      }
+
+      await BorrowBook.update(
+        { status: BookStatus.EXPIRED, qrcode: null },
+        { where: { id: { [Op.in]: borrowToDeleteIDs } } }
+      );
+    }
 
     return {
       data: paginationBorrowBook.map((borrow) => ({

@@ -18,6 +18,7 @@ UserRoute.post("/forgotpassword", User_controller_1.ForgotPassword);
 UserRoute.post("/logout", UserValidate_1.VerifyToken, Account_controller_1.SignOut);
 UserRoute.post("/checkout", UserValidate_1.VerifyToken, BorrowBook_controller_1.default);
 //BorrowBook
+UserRoute.post("/verifybook", UserValidate_1.VerifyToken, bookcart_controller_1.VerifyBookByUser);
 UserRoute.get("/checkcart", UserValidate_1.VerifyToken, bookcart_controller_1.CountBucketItems);
 UserRoute.get("/getborrowbook", UserValidate_1.VerifyToken, GetBorrowBook_1.GetBorrowBook);
 UserRoute.get("/getborrowdetail", UserValidate_1.VerifyToken, GetBorrowBook_1.GetBorrowBookDetail);
